@@ -11,7 +11,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { ArrowLeft, CalendarDays, Plus, Mic, MicOff, Copy, Check, RotateCcw, AlertTriangle } from "lucide-react";
+import { ArrowLeft, CalendarDays, Plus, Mic, MicOff, Copy, Check, RotateCcw, AlertTriangle, Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -150,7 +151,11 @@ export default function Appointments() {
                   {dayAppts.slice(0, 2).map(a => (
                     <div
                       key={a.id}
-                      className="text-[10px] truncate bg-primary/10 text-primary rounded px-1 mt-0.5 cursor-pointer"
+                      className={`text-[10px] truncate rounded px-1 mt-0.5 cursor-pointer ${
+                        a.status === "cancelado"
+                          ? "bg-destructive/10 text-destructive line-through"
+                          : "bg-primary/10 text-primary"
+                      }`}
                       onClick={(e) => { e.stopPropagation(); navigate(`/atendimentos/${a.id}`); }}
                     >
                       {a.hora && `${a.hora.slice(0, 5)} `}
@@ -424,6 +429,36 @@ export function AppointmentForm() {
               <Button type="button" variant="outline" onClick={() => navigate("/atendimentos")}>
                 Cancelar
               </Button>
+              {id && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button type="button" variant="destructive" className="ml-auto">
+                      <Trash2 className="h-4 w-4 mr-1" /> Excluir
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Excluir atendimento?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Esta ação não pode ser desfeita. O atendimento será removido permanentemente.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        onClick={async () => {
+                          await supabase.from("appointments").update({ archived: true }).eq("id", id);
+                          toast.success("Atendimento excluído!");
+                          navigate("/atendimentos");
+                        }}
+                      >
+                        Excluir
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
             </div>
           </form>
         </CardContent>
