@@ -115,6 +115,20 @@ export default function Appointments() {
         </Button>
       </div>
 
+      {/* Monthly counters */}
+      {(() => {
+        const agendados = appointments.filter(a => a.status === "agendado").length;
+        const realizados = appointments.filter(a => a.status === "realizado").length;
+        const cancelados = appointments.filter(a => a.status === "cancelado").length;
+        return (
+          <div className="grid grid-cols-3 gap-3">
+            <Card><CardContent className="p-4 text-center"><p className="text-xs text-muted-foreground">Agendados</p><p className="text-2xl font-bold text-blue-500">{agendados}</p></CardContent></Card>
+            <Card><CardContent className="p-4 text-center"><p className="text-xs text-muted-foreground">Realizados</p><p className="text-2xl font-bold text-green-600">{realizados}</p></CardContent></Card>
+            <Card><CardContent className="p-4 text-center"><p className="text-xs text-muted-foreground">Cancelados</p><p className="text-2xl font-bold text-destructive">{cancelados}</p></CardContent></Card>
+          </div>
+        );
+      })()}
+
       {/* Calendar nav */}
       <div className="flex items-center justify-between">
         <Button variant="outline" size="sm" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>←</Button>
@@ -134,16 +148,14 @@ export default function Appointments() {
             {days.map((day) => {
               const dayAppts = getApptsForDay(day);
               const isToday = isSameDay(day, new Date());
+              const isSelected = isSameDay(day, selectedDate);
               return (
                 <div
                   key={day.toISOString()}
                   className={`min-h-[60px] sm:min-h-[80px] p-1 border rounded-sm cursor-pointer hover:bg-muted/50 transition-colors ${
                     !isSameMonth(day, currentMonth) ? "opacity-30" : ""
-                  } ${isToday ? "bg-primary/5 border-primary" : ""}`}
-                  onClick={() => {
-                    setSelectedDate(day);
-                    navigate(`/atendimentos/novo?data=${format(day, "yyyy-MM-dd")}`);
-                  }}
+                  } ${isToday ? "bg-primary/5 border-primary" : ""} ${isSelected && !isToday ? "bg-accent/30 border-accent" : ""}`}
+                  onClick={() => setSelectedDate(day)}
                 >
                   <span className={`text-xs ${isToday ? "font-bold text-primary" : "text-muted-foreground"}`}>
                     {format(day, "d")}
@@ -154,7 +166,9 @@ export default function Appointments() {
                       className={`text-[10px] truncate rounded px-1 mt-0.5 cursor-pointer ${
                         a.status === "cancelado"
                           ? "bg-destructive/10 text-destructive line-through"
-                          : "bg-primary/10 text-primary"
+                          : a.status === "agendado"
+                            ? "bg-blue-500/10 text-blue-600"
+                            : "bg-primary/10 text-primary"
                       }`}
                       onClick={(e) => { e.stopPropagation(); navigate(`/atendimentos/${a.id}`); }}
                     >
@@ -169,6 +183,41 @@ export default function Appointments() {
               );
             })}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Daily detail view */}
+      <Card>
+        <CardContent className="pt-6 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold">
+              {format(selectedDate, "dd 'de' MMMM, EEEE", { locale: ptBR })}
+            </h3>
+            <Button size="sm" onClick={() => navigate(`/atendimentos/novo?data=${format(selectedDate, "yyyy-MM-dd")}`)}>
+              <Plus className="h-4 w-4 mr-1" /> Novo
+            </Button>
+          </div>
+          {(() => {
+            const dayAppts = getApptsForDay(selectedDate);
+            if (dayAppts.length === 0) return <p className="text-sm text-muted-foreground">Nenhum atendimento neste dia</p>;
+            return dayAppts
+              .sort((a, b) => (a.hora || "").localeCompare(b.hora || ""))
+              .map(a => (
+                <div
+                  key={a.id}
+                  className="p-3 border rounded-lg flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => navigate(`/atendimentos/${a.id}`)}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-mono text-muted-foreground w-12">{a.hora ? a.hora.slice(0, 5) : "--:--"}</span>
+                    <span className="text-sm font-medium">{(a as any).patients?.nome_completo || "Paciente"}</span>
+                  </div>
+                  <Badge variant={a.status === "realizado" ? "default" : a.status === "cancelado" ? "destructive" : "secondary"}>
+                    {a.status}
+                  </Badge>
+                </div>
+              ));
+          })()}
         </CardContent>
       </Card>
     </div>
