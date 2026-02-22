@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ArrowLeft, Edit, Save, Plus, FileText, Trash2 } from "lucide-react";
+import { ArrowLeft, Edit, Save, Plus, FileText, Trash2, Download } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -35,8 +35,17 @@ export default function PatientDetail() {
   // Dialogs
   const [conditionDialog, setConditionDialog] = useState(false);
   const [noteDialog, setNoteDialog] = useState(false);
+  const [receivableDialog, setReceivableDialog] = useState(false);
   const [newCondition, setNewCondition] = useState({ nome_condicao: "", data_inicio: "", observacao: "" });
   const [newNote, setNewNote] = useState({ data_nota: format(new Date(), "yyyy-MM-dd"), texto_nota: "" });
+  const [newReceivable, setNewReceivable] = useState({ data_cobranca: format(new Date(), "yyyy-MM-dd"), valor: "", forma_pagamento: "", observacao: "" });
+
+  // Financial filter
+  const [financeMonth, setFinanceMonth] = useState(format(new Date(), "yyyy-MM"));
+
+  // Evolution export filter
+  const [evoStart, setEvoStart] = useState("");
+  const [evoEnd, setEvoEnd] = useState("");
 
   const fetchAll = async () => {
     if (!user || !id) return;
@@ -65,9 +74,10 @@ export default function PatientDetail() {
 
   const handleSave = async () => {
     if (!id || !user) return;
+    const { nome_completo, telefone, responsavel_nome, endereco, doenca_principal, status, observacoes_gerais } = form;
     const { error } = await supabase
       .from("patients")
-      .update({ ...form, updated_by: user.id })
+      .update({ nome_completo, telefone, responsavel_nome, endereco, doenca_principal, status, observacoes_gerais, updated_by: user.id })
       .eq("id", id);
     if (error) { toast.error("Erro ao salvar"); return; }
     toast.success("Paciente atualizado!");
@@ -112,6 +122,27 @@ export default function PatientDetail() {
     fetchAll();
   };
 
+  const addReceivable = async () => {
+    if (!user || !id) return;
+    if (!newReceivable.valor) { toast.error("Informe o valor"); return; }
+    const { error } = await supabase.from("receivables").insert({
+      patient_id: id,
+      user_id: user.id,
+      data_cobranca: newReceivable.data_cobranca,
+      valor: parseFloat(newReceivable.valor),
+      forma_pagamento: newReceivable.forma_pagamento || null,
+      observacao: newReceivable.observacao || null,
+      origem: "manual",
+      created_by: user.id,
+      updated_by: user.id,
+    });
+    if (error) { toast.error("Erro ao criar recebível"); return; }
+    toast.success("Recebível criado");
+    setReceivableDialog(false);
+    setNewReceivable({ data_cobranca: format(new Date(), "yyyy-MM-dd"), valor: "", forma_pagamento: "", observacao: "" });
+    fetchAll();
+  };
+
   const markAsPaid = async (recId: string) => {
     const { error } = await supabase.from("receivables").update({
       status_pagamento: "pago",
@@ -127,8 +158,45 @@ export default function PatientDetail() {
   if (loading) return <div className="text-center py-12 text-muted-foreground">Carregando...</div>;
   if (!patient) return <div className="text-center py-12">Paciente não encontrado</div>;
 
-  const totalPago = receivables.filter(r => r.status_pagamento === "pago").reduce((s, r) => s + Number(r.valor), 0);
-  const totalPendente = receivables.filter(r => r.status_pagamento === "pendente").reduce((s, r) => s + Number(r.valor), 0);
+  // Financial filter
+  const filteredReceivables = receivables.filter(r => r.data_cobranca.startsWith(financeMonth));
+  const totalPago = filteredReceivables.filter(r => r.status_pagamento === "pago").reduce((s, r) => s + Number(r.valor), 0);
+  const totalPendente = filteredReceivables.filter(r => r.status_pagamento === "pendente").reduce((s, r) => s + Number(r.valor), 0);
+
+  // Evolution items with optional date filter
+  const allEvoItems = [
+    ...appointments.map(a => ({ type: "appointment" as const, date: a.data_atendimento, data: a })),
+    ...clinicalNotes.map(n => ({ type: "note" as const, date: n.data_nota, data: n })),
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const filteredEvoItems = allEvoItems.filter(item => {
+    if (evoStart && item.date < evoStart) return false;
+    if (evoEnd && item.date > evoEnd) return false;
+    return true;
+  });
+
+  const exportEvoPDF = () => {
+    const items = filteredEvoItems;
+    if (items.length === 0) { toast.error("Nenhum registro para exportar"); return; }
+
+    const periodoText = evoStart || evoEnd
+      ? `Período: ${evoStart ? format(new Date(evoStart + "T00:00:00"), "dd/MM/yyyy") : "início"} a ${evoEnd ? format(new Date(evoEnd + "T00:00:00"), "dd/MM/yyyy") : "hoje"}`
+      : "Período: Todos";
+
+    const rows = items.map(item => {
+      const dateStr = format(new Date(item.date + "T00:00:00"), "dd/MM/yyyy");
+      const tipo = item.type === "appointment" ? "Atendimento" : "Nota Clínica";
+      const texto = item.type === "appointment"
+        ? (item.data as Appointment).texto_prontuario || "Sem prontuário"
+        : (item.data as ClinicalNote).texto_nota;
+      return `<tr><td style="padding:8px;border:1px solid #ddd;">${dateStr}</td><td style="padding:8px;border:1px solid #ddd;">${tipo}</td><td style="padding:8px;border:1px solid #ddd;white-space:pre-wrap;">${texto}</td></tr>`;
+    }).join("");
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Evolução - ${patient.nome_completo}</title><style>body{font-family:Arial,sans-serif;padding:20px}h1{font-size:18px}h2{font-size:14px;color:#666}table{width:100%;border-collapse:collapse;margin-top:16px}th{background:#f5f5f5;padding:8px;border:1px solid #ddd;text-align:left}@media print{button{display:none}}</style></head><body><h1>Evolução Clínica - ${patient.nome_completo}</h1><h2>${periodoText}</h2><table><thead><tr><th>Data</th><th>Tipo</th><th>Conteúdo</th></tr></thead><tbody>${rows}</tbody></table><br><button onclick="window.print()">Imprimir / Salvar PDF</button></body></html>`;
+
+    const w = window.open("", "_blank");
+    if (w) { w.document.write(html); w.document.close(); }
+  };
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -235,7 +303,7 @@ export default function PatientDetail() {
                   {conditions.map((c) => (
                     <div key={c.id} className="p-3 border rounded-lg">
                       <p className="font-medium">{c.nome_condicao}</p>
-                      {c.data_inicio && <p className="text-xs text-muted-foreground">Início: {format(new Date(c.data_inicio), "dd/MM/yyyy")}</p>}
+                      {c.data_inicio && <p className="text-xs text-muted-foreground">Início: {format(new Date(c.data_inicio + "T00:00:00"), "dd/MM/yyyy")}</p>}
                       {c.observacao && <p className="text-sm text-muted-foreground mt-1">{c.observacao}</p>}
                     </div>
                   ))}
@@ -249,63 +317,77 @@ export default function PatientDetail() {
         <TabsContent value="evolucao">
           <Card>
             <CardContent className="pt-6 space-y-4">
-              <div className="flex justify-between items-center">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <h3 className="font-semibold">Evolução Clínica</h3>
-                <Dialog open={noteDialog} onOpenChange={setNoteDialog}>
-                  <DialogTrigger asChild>
-                    <Button size="sm" variant="outline"><Plus className="h-4 w-4 mr-1" />Nota Avulsa</Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader><DialogTitle>Nova Nota Clínica</DialogTitle></DialogHeader>
-                    <div className="space-y-3">
-                      <div><Label>Data *</Label><Input type="date" value={newNote.data_nota} onChange={(e) => setNewNote(p => ({ ...p, data_nota: e.target.value }))} /></div>
-                      <div><Label>Texto *</Label><Textarea value={newNote.texto_nota} onChange={(e) => setNewNote(p => ({ ...p, texto_nota: e.target.value }))} rows={4} /></div>
-                      <Button onClick={addNote}>Salvar</Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
+                <div className="flex gap-2 flex-wrap">
+                  <Button size="sm" variant="outline" onClick={exportEvoPDF}>
+                    <Download className="h-4 w-4 mr-1" />Exportar PDF
+                  </Button>
+                  <Dialog open={noteDialog} onOpenChange={setNoteDialog}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" variant="outline"><Plus className="h-4 w-4 mr-1" />Nota Avulsa</Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader><DialogTitle>Nova Nota Clínica</DialogTitle></DialogHeader>
+                      <div className="space-y-3">
+                        <div><Label>Data *</Label><Input type="date" value={newNote.data_nota} onChange={(e) => setNewNote(p => ({ ...p, data_nota: e.target.value }))} /></div>
+                        <div><Label>Texto *</Label><Textarea value={newNote.texto_nota} onChange={(e) => setNewNote(p => ({ ...p, texto_nota: e.target.value }))} rows={4} /></div>
+                        <Button onClick={addNote}>Salvar</Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </div>
+
+              {/* Date filters */}
+              <div className="flex gap-3 flex-wrap">
+                <div className="space-y-1">
+                  <Label className="text-xs">De</Label>
+                  <Input type="date" value={evoStart} onChange={(e) => setEvoStart(e.target.value)} className="w-auto" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Até</Label>
+                  <Input type="date" value={evoEnd} onChange={(e) => setEvoEnd(e.target.value)} className="w-auto" />
+                </div>
+                {(evoStart || evoEnd) && (
+                  <Button size="sm" variant="ghost" className="self-end" onClick={() => { setEvoStart(""); setEvoEnd(""); }}>Limpar</Button>
+                )}
               </div>
 
               {/* Timeline */}
               <div className="space-y-3">
-                {appointments.length === 0 && clinicalNotes.length === 0 && (
+                {filteredEvoItems.length === 0 && (
                   <p className="text-muted-foreground text-sm">Nenhum registro de evolução</p>
                 )}
 
-                {/* Mix appointments and notes by date */}
-                {[
-                  ...appointments.map(a => ({ type: "appointment" as const, date: a.data_atendimento, data: a })),
-                  ...clinicalNotes.map(n => ({ type: "note" as const, date: n.data_nota, data: n })),
-                ]
-                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                  .map((item) => (
-                    <div key={item.data.id} className="p-3 border rounded-lg border-l-4"
-                      style={{ borderLeftColor: item.type === "appointment" ? "hsl(var(--primary))" : "hsl(var(--accent))" }}>
-                      <div className="flex items-center gap-2 mb-1">
-                        <Badge variant={item.type === "appointment" ? "default" : "secondary"}>
-                          {item.type === "appointment" ? "Atendimento" : "Nota"}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">
-                          {format(new Date(item.date), "dd/MM/yyyy", { locale: ptBR })}
-                        </span>
-                      </div>
-                      <p className="text-sm line-clamp-3">
-                        {item.type === "appointment"
-                          ? (item.data as Appointment).texto_prontuario || "Sem prontuário"
-                          : (item.data as ClinicalNote).texto_nota}
-                      </p>
-                      {item.type === "appointment" && (
-                        <Button
-                          size="sm"
-                          variant="link"
-                          className="p-0 h-auto mt-1"
-                          onClick={() => navigate(`/atendimentos/${item.data.id}`)}
-                        >
-                          <FileText className="h-3 w-3 mr-1" /> Abrir atendimento
-                        </Button>
-                      )}
+                {filteredEvoItems.map((item) => (
+                  <div key={item.data.id} className="p-3 border rounded-lg border-l-4"
+                    style={{ borderLeftColor: item.type === "appointment" ? "hsl(var(--primary))" : "hsl(var(--accent))" }}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge variant={item.type === "appointment" ? "default" : "secondary"}>
+                        {item.type === "appointment" ? "Atendimento" : "Nota"}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {format(new Date(item.date + "T00:00:00"), "dd/MM/yyyy", { locale: ptBR })}
+                      </span>
                     </div>
-                  ))}
+                    <p className="text-sm line-clamp-3">
+                      {item.type === "appointment"
+                        ? (item.data as Appointment).texto_prontuario || "Sem prontuário"
+                        : (item.data as ClinicalNote).texto_nota}
+                    </p>
+                    {item.type === "appointment" && (
+                      <Button
+                        size="sm"
+                        variant="link"
+                        className="p-0 h-auto mt-1"
+                        onClick={() => navigate(`/atendimentos/${item.data.id}`)}
+                      >
+                        <FileText className="h-3 w-3 mr-1" /> Abrir atendimento
+                      </Button>
+                    )}
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
@@ -314,10 +396,16 @@ export default function PatientDetail() {
         {/* ABA 4 - FINANCEIRO */}
         <TabsContent value="financeiro">
           <div className="space-y-4">
+            {/* Month filter */}
+            <div className="flex items-center gap-3">
+              <Label className="text-sm font-medium">Mês:</Label>
+              <Input type="month" value={financeMonth} onChange={(e) => setFinanceMonth(e.target.value)} className="w-auto" />
+            </div>
+
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <Card><CardContent className="p-4 text-center"><p className="text-xs text-muted-foreground">Atendimentos</p><p className="text-2xl font-bold">{appointments.length}</p></CardContent></Card>
-              <Card><CardContent className="p-4 text-center"><p className="text-xs text-muted-foreground">Pendente</p><p className="text-2xl font-bold text-warning">R$ {totalPendente.toFixed(2)}</p></CardContent></Card>
-              <Card><CardContent className="p-4 text-center"><p className="text-xs text-muted-foreground">Pago</p><p className="text-2xl font-bold text-success">R$ {totalPago.toFixed(2)}</p></CardContent></Card>
+              <Card><CardContent className="p-4 text-center"><p className="text-xs text-muted-foreground">Pendente</p><p className="text-2xl font-bold text-orange-500">R$ {totalPendente.toFixed(2)}</p></CardContent></Card>
+              <Card><CardContent className="p-4 text-center"><p className="text-xs text-muted-foreground">Pago</p><p className="text-2xl font-bold text-green-600">R$ {totalPago.toFixed(2)}</p></CardContent></Card>
               <Card><CardContent className="p-4 text-center"><p className="text-xs text-muted-foreground">Saldo</p><p className="text-2xl font-bold">R$ {(totalPendente).toFixed(2)}</p></CardContent></Card>
             </div>
 
@@ -325,19 +413,43 @@ export default function PatientDetail() {
               <CardContent className="pt-6 space-y-4">
                 <div className="flex justify-between items-center">
                   <h3 className="font-semibold">Recebíveis</h3>
-                  <Button size="sm" onClick={() => navigate(`/financeiro/novo?paciente=${id}`)}>
-                    <Plus className="h-4 w-4 mr-1" /> Novo Recebível
-                  </Button>
+                  <Dialog open={receivableDialog} onOpenChange={setReceivableDialog}>
+                    <DialogTrigger asChild>
+                      <Button size="sm"><Plus className="h-4 w-4 mr-1" /> Novo Recebível</Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader><DialogTitle>Novo Recebível</DialogTitle></DialogHeader>
+                      <div className="space-y-3">
+                        <div><Label>Data Cobrança *</Label><Input type="date" value={newReceivable.data_cobranca} onChange={(e) => setNewReceivable(p => ({ ...p, data_cobranca: e.target.value }))} /></div>
+                        <div><Label>Valor (R$) *</Label><Input type="number" step="0.01" value={newReceivable.valor} onChange={(e) => setNewReceivable(p => ({ ...p, valor: e.target.value }))} /></div>
+                        <div>
+                          <Label>Forma de Pagamento</Label>
+                          <Select value={newReceivable.forma_pagamento} onValueChange={(v) => setNewReceivable(p => ({ ...p, forma_pagamento: v }))}>
+                            <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                              <SelectItem value="pix">PIX</SelectItem>
+                              <SelectItem value="cartao_credito">Cartão Crédito</SelectItem>
+                              <SelectItem value="cartao_debito">Cartão Débito</SelectItem>
+                              <SelectItem value="transferencia">Transferência</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div><Label>Observação</Label><Input value={newReceivable.observacao} onChange={(e) => setNewReceivable(p => ({ ...p, observacao: e.target.value }))} /></div>
+                        <Button onClick={addReceivable}>Salvar</Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </div>
-                {receivables.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">Nenhum recebível</p>
+                {filteredReceivables.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">Nenhum recebível neste mês</p>
                 ) : (
                   <div className="space-y-2">
-                    {receivables.map((r) => (
+                    {filteredReceivables.map((r) => (
                       <div key={r.id} className="p-3 border rounded-lg flex items-center justify-between">
                         <div>
                           <p className="text-sm font-medium">R$ {Number(r.valor).toFixed(2)}</p>
-                          <p className="text-xs text-muted-foreground">{format(new Date(r.data_cobranca), "dd/MM/yyyy")}</p>
+                          <p className="text-xs text-muted-foreground">{format(new Date(r.data_cobranca + "T00:00:00"), "dd/MM/yyyy")}</p>
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge variant={r.status_pagamento === "pago" ? "default" : r.status_pagamento === "pendente" ? "secondary" : "destructive"}>

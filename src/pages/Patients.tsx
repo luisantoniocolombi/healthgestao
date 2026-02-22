@@ -6,7 +6,7 @@ import { Patient } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -21,14 +21,16 @@ export default function Patients() {
 
   const fetchPatients = async () => {
     if (!user) return;
+    const isArchived = statusFilter === "arquivados";
+
     let query = supabase
       .from("patients")
       .select("*")
       .eq("user_id", user.id)
-      .eq("archived", false)
+      .eq("archived", isArchived)
       .order("nome_completo");
 
-    if (statusFilter !== "todos") {
+    if (!isArchived && statusFilter !== "todos") {
       query = query.eq("status", statusFilter);
     }
 
@@ -77,13 +79,14 @@ export default function Patients() {
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-40">
+          <SelectTrigger className="w-full sm:w-44">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="todos">Todos</SelectItem>
             <SelectItem value="ativo">Ativos</SelectItem>
             <SelectItem value="inativo">Inativos</SelectItem>
+            <SelectItem value="arquivados">Arquivados</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -114,9 +117,14 @@ export default function Patients() {
                     </p>
                   )}
                 </div>
-                <Badge variant={patient.status === "ativo" ? "default" : "secondary"}>
-                  {patient.status === "ativo" ? "Ativo" : "Inativo"}
-                </Badge>
+                <div className="flex gap-2">
+                  {patient.archived && (
+                    <Badge variant="outline" className="text-muted-foreground">Arquivado</Badge>
+                  )}
+                  <Badge variant={patient.status === "ativo" ? "default" : "secondary"}>
+                    {patient.status === "ativo" ? "Ativo" : "Inativo"}
+                  </Badge>
+                </div>
               </CardContent>
             </Card>
           ))}
