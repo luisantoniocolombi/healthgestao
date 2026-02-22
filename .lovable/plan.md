@@ -1,119 +1,103 @@
 
 
-# Sistema de Gestão para Fonoaudióloga
+# Plano de Correções e Melhorias — FonoGestão
 
-## Visão Geral
-Sistema web responsivo em português (BR) para gestão clínica de fonoaudiologia, cobrindo pacientes, atendimentos/prontuários e financeiro. Backend com Supabase (Postgres, Auth, Storage, Edge Functions).
+## Resumo dos Itens
 
----
-
-## 🔐 Autenticação e Segurança
-- Login com e-mail/senha via Supabase Auth
-- Recuperação de senha
-- Todos os dados segregados por `user_id` com RLS obrigatório
-- Arquivos privados no Storage (segregados por `user_id`)
-- Aviso de privacidade no ditado por voz
-- Soft delete em todas as entidades (campo `archived`)
-- Campos de auditoria: `created_at`, `updated_at`, `created_by`, `updated_by`
+| # | Tipo | Descrição |
+|---|------|-----------|
+| 1 | Bug | Edição de paciente não salva |
+| 2 | Feature | Mostrar pacientes arquivados |
+| 3 | Feature | Permitir alterar status ativo/inativo (já existe, depende do bug 1) |
+| 4 | Feature | Visão diária na aba Atendimentos |
+| 5 | Feature | Contadores agendados/realizados/cancelados no mês |
+| 6 | Feature | Filtro por mês no financeiro do paciente + exportar evolução em PDF |
+| 7 | Bug | Novo recebível dentro do cadastro do paciente |
 
 ---
 
-## 📋 Módulo 1 — Pacientes
+## Detalhamento Técnico
 
-### Lista de Pacientes
-- Busca por nome, telefone e responsável
-- Filtro ativo/inativo
-- Botão "Novo Paciente"
+### 1. Bug: Edição de paciente não salva
 
-### Detalhe do Paciente (4 abas)
+**Causa raiz:** O `handleSave` envia `...form` que inclui campos do sistema como `id`, `user_id`, `created_at`, `updated_at`, etc. O Supabase rejeita a atualização desses campos. A solução é enviar apenas os campos editáveis.
 
-**Aba 1 — Dados Cadastrais**
-- Nome completo, telefone, endereço, responsável, doença principal, observações, status
-
-**Aba 2 — Condições e Exames**
-- Lista de condições clínicas (nome, data início, observação)
-- Upload de anexos médicos (título, data, arquivo privado no Storage)
-
-**Aba 3 — Evolução Clínica**
-- Linha do tempo dos atendimentos (sem duplicação de dados)
-- Preview do prontuário com link para abrir atendimento completo
-- Filtro por mês/ano
-- Notas clínicas avulsas com anexos opcionais
-
-**Aba 4 — Financeiro do Paciente**
-- Cards: atendimentos do mês, total pendente, total pago, saldo
-- Tabela editável de recebíveis
-- Botões: "Novo Recebível" e "Gerar cobrança a partir de atendimento"
+**Correção em `PatientDetail.tsx`:**
+- Extrair somente os campos editáveis no `handleSave`: `nome_completo`, `telefone`, `responsavel_nome`, `endereco`, `doenca_principal`, `status`, `observacoes_gerais`.
 
 ---
 
-## 📅 Módulo 2 — Atendimentos (Prontuários)
+### 2. Mostrar pacientes arquivados
 
-### Visões de Calendário
-- Dia, Semana e Mês
-- Filtros por paciente e status
-
-### Criar/Editar Atendimento
-- Campos obrigatórios: paciente, data
-- Campos opcionais: hora, texto do prontuário, anexos
-- Toggle "Criar cobrança deste atendimento?" com mini-formulário (valor, status, observação)
-
-### 🎤 Ditado por Voz (Web Speech API)
-- Botão "Gravar Áudio" no prontuário
-- Estados visuais: gravando → processando → pronto
-- Transcrição editável antes de salvar
-- Botões: Inserir no prontuário, Regravar, Copiar
-- Opção de salvar áudio como anexo no Storage
-- Aviso de privacidade ao usar ditado
-- Fallback para texto manual se microfone indisponível
+**Correção em `Patients.tsx`:**
+- Adicionar uma opção "Arquivados" no filtro de status existente.
+- Quando selecionado, consultar `.eq("archived", true)` em vez de `.eq("archived", false)`.
+- Exibir badge "Arquivado" nos cards desses pacientes.
 
 ---
 
-## 💰 Módulo 3 — Financeiro
+### 3. Status ativo/inativo editável
 
-### Dashboard
-- Cards: total atendimentos, a receber, recebido, cancelados, ticket médio
-- Tabela de recebíveis com filtros (mês, status, paciente)
-- Ações rápidas: marcar como pago, editar, cancelar
-
-### Novo Recebível
-- Paciente, data, valor, status, forma de pagamento, observação
-- Vínculo opcional com atendimento
-- Origem: manual ou via atendimento
-
-### Fechamento do Mês
-- Resumo por paciente: atendimentos, cobranças, pendente, pago, saldo
-- Exportar CSV
-- Gerar PDF via Edge Function (cabeçalho profissional, resumo, tabelas, paginação)
+O campo Select de status já existe na aba Dados do paciente (linhas 193-199 de `PatientDetail.tsx`). Ele já funciona com o modo edição. O bug 1 impede o salvamento. Corrigindo o bug 1, essa funcionalidade passa a funcionar automaticamente.
 
 ---
 
-## 🗄️ Banco de Dados (Supabase/Postgres)
+### 4. Visão diária na aba Atendimentos
 
-### Tabelas
-- `patients` — dados cadastrais
-- `conditions` — condições clínicas (vinculada a paciente)
-- `medical_attachments` — anexos médicos (vinculada a paciente)
-- `clinical_notes` — notas avulsas (vinculada a paciente)
-- `appointments` — atendimentos com campos de transcrição
-- `receivables` — recebíveis financeiros
-
-### Segurança
-- RLS em todas as tabelas: `auth.uid() = user_id`
-- Storage com buckets privados por `user_id`
-- Índices otimizados para consultas frequentes
+**Correção em `Appointments.tsx`:**
+- Ao clicar em um dia do calendário, em vez de redirecionar para "novo atendimento", abrir uma lista dos atendimentos daquele dia logo abaixo do calendário.
+- Exibir cards com: horário, nome do paciente, status (com cores), e botão para abrir/editar.
+- Manter um botão "Novo Atendimento" dentro da visão diária para criar naquela data.
 
 ---
 
-## 🧭 Navegação
-- Menu lateral responsivo (colapsável em mobile)
-- 3 itens: Pacientes, Atendimentos, Financeiro
-- Header com nome do profissional e logout
+### 5. Contadores agendados/realizados/cancelados
+
+**Correção em `Appointments.tsx`:**
+- Adicionar 3 cards acima do calendário mostrando os totais do mês corrente:
+  - Agendados (azul)
+  - Realizados (verde)
+  - Cancelados (vermelho)
+- Calcular a partir dos dados de `appointments` já carregados.
 
 ---
 
-## 📱 Responsividade
-- Layout adaptável para desktop e mobile
-- Tabelas com scroll horizontal em telas pequenas
-- Calendário adaptado para mobile
+### 6a. Filtro por mês na aba Financeiro do paciente
+
+**Correção em `PatientDetail.tsx` (aba Financeiro):**
+- Adicionar um seletor `<Input type="month">` acima da lista de recebíveis.
+- Filtrar localmente os recebíveis pelo mês selecionado.
+- Recalcular os cards (Pendente, Pago, Saldo) com base no filtro.
+
+### 6b. Exportar evolução em PDF
+
+**Correção em `PatientDetail.tsx` (aba Evolução):**
+- Adicionar filtro de período (data início e data fim).
+- Adicionar botão "Exportar PDF".
+- Gerar PDF no frontend usando construção manual de Blob com layout HTML:
+  - Cabeçalho com nome do paciente e período.
+  - Lista cronológica de atendimentos e notas clínicas.
+  - Usar `window.print()` com área de impressão estilizada, ou gerar HTML para abrir em nova janela para impressão.
+
+---
+
+### 7. Bug: Novo recebível dentro do cadastro do paciente
+
+**Causa raiz:** O botão "Novo Recebível" navega para `/financeiro/novo?paciente=${id}`, mas essa rota não existe no `App.tsx`.
+
+**Correção em `PatientDetail.tsx`:**
+- Substituir a navegação por um Dialog inline (igual ao da página Financeiro).
+- O formulário já terá o `patient_id` pré-preenchido.
+- Campos: data, valor, forma de pagamento, observação.
+- Após salvar, recarregar os dados com `fetchAll()`.
+
+---
+
+## Arquivos Modificados
+
+1. `src/pages/PatientDetail.tsx` — Bugs 1, 7; Features 6a, 6b
+2. `src/pages/Patients.tsx` — Feature 2
+3. `src/pages/Appointments.tsx` — Features 4, 5
+
+Nenhuma alteração de banco de dados necessária.
 
