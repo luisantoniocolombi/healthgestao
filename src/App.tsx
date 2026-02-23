@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { AppLayout } from "@/components/AppLayout";
 import Login from "./pages/Login";
+import Signup from "./pages/Signup";
 import ResetPassword from "./pages/ResetPassword";
 import Patients from "./pages/Patients";
 import PatientForm from "./pages/PatientForm";
@@ -39,6 +40,7 @@ const App = () => (
         <AuthProvider>
           <Routes>
             <Route path="/login" element={<AuthRoute><Login /></AuthRoute>} />
+            <Route path="/signup" element={<AuthRoute><Signup /></AuthRoute>} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/" element={<Navigate to="/pacientes" replace />} />
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
