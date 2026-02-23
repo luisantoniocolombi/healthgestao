@@ -86,6 +86,38 @@ export interface Receivable {
   archived: boolean;
   created_at: string;
   updated_at: string;
+  conta_principal_id?: string;
+  profissional_id?: string;
   // Joined
   patients?: { nome_completo: string };
+}
+
+export interface Profile {
+  id: string;
+  nome: string;
+  cor_identificacao: string;
+  conta_principal_id: string;
+  ativo: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type AppRole = 'admin' | 'profissional';
+
+export interface UserRole {
+  id: string;
+  user_id: string;
+  role: AppRole;
+}
+
+export interface Invitation {
+  id: string;
+  admin_id: string;
+  email: string;
+  nome_profissional?: string;
+  cor_identificacao?: string;
+  token: string;
+  status: 'pendente' | 'aceito' | 'expirado';
+  created_at: string;
+  expires_at: string;
 }
