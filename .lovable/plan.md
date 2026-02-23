@@ -1,103 +1,206 @@
 
 
-# Plano de Correções e Melhorias — FonoGestão
+# Sistema Multiusuario com Hierarquia Admin/Profissional
 
-## Resumo dos Itens
+## Decisao Arquitetural Importante
 
-| # | Tipo | Descrição |
-|---|------|-----------|
-| 1 | Bug | Edição de paciente não salva |
-| 2 | Feature | Mostrar pacientes arquivados |
-| 3 | Feature | Permitir alterar status ativo/inativo (já existe, depende do bug 1) |
-| 4 | Feature | Visão diária na aba Atendimentos |
-| 5 | Feature | Contadores agendados/realizados/cancelados no mês |
-| 6 | Feature | Filtro por mês no financeiro do paciente + exportar evolução em PDF |
-| 7 | Bug | Novo recebível dentro do cadastro do paciente |
+Em vez de **duplicar fisicamente** os atendimentos (espelhamento), vamos usar uma abordagem mais robusta: adicionar `conta_principal_id` em todas as tabelas e ajustar as politicas de seguranca (RLS) para que o Administrador veja todos os registros dos profissionais vinculados. Isso evita:
+
+- Duplicacao de dados e inconsistencias
+- Problemas de sincronizacao entre registros espelhados
+- Dobro de armazenamento desnecessario
+
+O resultado final e identico: o Admin ve tudo consolidado, o Profissional ve so o dele.
 
 ---
 
-## Detalhamento Técnico
+## Fase 1: Banco de Dados (Migracao SQL)
 
-### 1. Bug: Edição de paciente não salva
+### 1.1 Tabela `profiles`
+```text
+profiles
+  id (UUID, PK, references auth.users ON DELETE CASCADE)
+  nome (TEXT, NOT NULL)
+  cor_identificacao (TEXT, default '#3b82f6')
+  conta_principal_id (UUID, references profiles.id)
+  ativo (BOOLEAN, default true)
+  created_at, updated_at
+```
+- Se admin: `conta_principal_id = id` (proprio)
+- Se profissional: `conta_principal_id = id do admin`
+- Trigger para criar profile automaticamente no signup
 
-**Causa raiz:** O `handleSave` envia `...form` que inclui campos do sistema como `id`, `user_id`, `created_at`, `updated_at`, etc. O Supabase rejeita a atualização desses campos. A solução é enviar apenas os campos editáveis.
+### 1.2 Tabela `user_roles` (conforme requisito de seguranca)
+```text
+user_roles
+  id (UUID, PK)
+  user_id (UUID, references auth.users ON DELETE CASCADE)
+  role (app_role ENUM: 'admin', 'profissional')
+  UNIQUE(user_id, role)
+```
+- Todo usuario que se cadastra diretamente recebe role `admin`
+- Profissional criado via convite recebe role `profissional`
 
-**Correção em `PatientDetail.tsx`:**
-- Extrair somente os campos editáveis no `handleSave`: `nome_completo`, `telefone`, `responsavel_nome`, `endereco`, `doenca_principal`, `status`, `observacoes_gerais`.
+### 1.3 Tabela `invitations`
+```text
+invitations
+  id (UUID, PK)
+  admin_id (UUID, NOT NULL)
+  email (TEXT, NOT NULL)
+  nome_profissional (TEXT)
+  cor_identificacao (TEXT)
+  token (TEXT, UNIQUE)
+  status ('pendente', 'aceito', 'expirado')
+  created_at, expires_at
+```
+
+### 1.4 Funcao de seguranca `has_role`
+Funcao `SECURITY DEFINER` para verificar roles sem recursao RLS.
+
+### 1.5 Funcao `get_conta_principal_id`
+Funcao `SECURITY DEFINER` que retorna o `conta_principal_id` do usuario autenticado. Usada nas politicas RLS.
+
+### 1.6 Alterar tabelas existentes
+Adicionar `conta_principal_id` em:
+- `patients`
+- `appointments`
+- `conditions`
+- `clinical_notes`
+- `medical_attachments`
+- `receivables`
+
+Adicionar `profissional_id` em:
+- `appointments` (quem realizou o atendimento)
+- `receivables` (quem gerou a cobranca)
+
+Preencher os registros existentes: `conta_principal_id = user_id` e `profissional_id = user_id`.
+
+Tornar `conta_principal_id` NOT NULL apos preenchimento.
+
+### 1.7 Novas politicas RLS
+Substituir as politicas atuais por:
+
+**Pacientes (e tabelas filhas):**
+- SELECT: `conta_principal_id = get_conta_principal_id(auth.uid())` (admin ve tudo da clinica, profissional tambem ve pacientes compartilhados)
+- INSERT: usuario autenticado, `conta_principal_id` preenchido
+- UPDATE/DELETE: admin pode tudo na clinica; profissional so os proprios
+
+**Atendimentos:**
+- SELECT Admin: `conta_principal_id = auth.uid()` (ve todos)
+- SELECT Profissional: `user_id = auth.uid()` (ve so os seus)
+- INSERT: `user_id = auth.uid()`
+- UPDATE/DELETE: dono do registro ou admin
+
+**Financeiro:**
+- Admin: ve tudo consolidado
+- Profissional: ve so os proprios
+
+### 1.8 Indices
+Novos indices em `conta_principal_id` para performance.
 
 ---
 
-### 2. Mostrar pacientes arquivados
+## Fase 2: Edge Function para Convites
 
-**Correção em `Patients.tsx`:**
-- Adicionar uma opção "Arquivados" no filtro de status existente.
-- Quando selecionado, consultar `.eq("archived", true)` em vez de `.eq("archived", false)`.
-- Exibir badge "Arquivado" nos cards desses pacientes.
-
----
-
-### 3. Status ativo/inativo editável
-
-O campo Select de status já existe na aba Dados do paciente (linhas 193-199 de `PatientDetail.tsx`). Ele já funciona com o modo edição. O bug 1 impede o salvamento. Corrigindo o bug 1, essa funcionalidade passa a funcionar automaticamente.
+### `invite-professional`
+- Recebe: email, nome, cor
+- Valida que o usuario autenticado e admin
+- Cria registro na tabela `invitations` com token unico
+- Gera link de convite: `{origin}/signup?token={token}`
+- Retorna o link para o admin copiar/enviar
 
 ---
 
-### 4. Visão diária na aba Atendimentos
+## Fase 3: Fluxo de Cadastro via Convite
 
-**Correção em `Appointments.tsx`:**
-- Ao clicar em um dia do calendário, em vez de redirecionar para "novo atendimento", abrir uma lista dos atendimentos daquele dia logo abaixo do calendário.
-- Exibir cards com: horário, nome do paciente, status (com cores), e botão para abrir/editar.
-- Manter um botão "Novo Atendimento" dentro da visão diária para criar naquela data.
-
----
-
-### 5. Contadores agendados/realizados/cancelados
-
-**Correção em `Appointments.tsx`:**
-- Adicionar 3 cards acima do calendário mostrando os totais do mês corrente:
-  - Agendados (azul)
-  - Realizados (verde)
-  - Cancelados (vermelho)
-- Calcular a partir dos dados de `appointments` já carregados.
+### Pagina `/signup` (novo componente)
+- Se tem `?token=` na URL: busca o convite, mostra nome do admin
+- Campos: email (pre-preenchido se possivel), senha
+- Ao criar conta:
+  1. `supabase.auth.signUp()`
+  2. Edge function `accept-invitation` que:
+     - Cria profile com `conta_principal_id` do admin
+     - Insere role `profissional` em `user_roles`
+     - Atualiza convite para `aceito`
 
 ---
 
-### 6a. Filtro por mês na aba Financeiro do paciente
+## Fase 4: Interface do Administrador
 
-**Correção em `PatientDetail.tsx` (aba Financeiro):**
-- Adicionar um seletor `<Input type="month">` acima da lista de recebíveis.
-- Filtrar localmente os recebíveis pelo mês selecionado.
-- Recalcular os cards (Pendente, Pago, Saldo) com base no filtro.
+### 4.1 Pagina de Gestao de Profissionais (`/profissionais`)
+- Lista profissionais vinculados (da tabela `profiles` onde `conta_principal_id = admin_id`)
+- Botao "Convidar Profissional" abre dialog com: nome, email, seletor de cor
+- Mostra link gerado para copiar
+- Permite ativar/desativar profissional
+- Permite alterar cor
 
-### 6b. Exportar evolução em PDF
+### 4.2 Menu lateral (AppSidebar)
+- Item "Profissionais" visivel apenas para admins
 
-**Correção em `PatientDetail.tsx` (aba Evolução):**
-- Adicionar filtro de período (data início e data fim).
-- Adicionar botão "Exportar PDF".
-- Gerar PDF no frontend usando construção manual de Blob com layout HTML:
-  - Cabeçalho com nome do paciente e período.
-  - Lista cronológica de atendimentos e notas clínicas.
-  - Usar `window.print()` com área de impressão estilizada, ou gerar HTML para abrir em nova janela para impressão.
+### 4.3 Filtro por Profissional
+- Na pagina de Atendimentos: adicionar dropdown "Profissional" para filtrar
+- Na pagina Financeiro: idem
+- No detalhe do paciente: mostrar qual profissional atendeu
 
----
-
-### 7. Bug: Novo recebível dentro do cadastro do paciente
-
-**Causa raiz:** O botão "Novo Recebível" navega para `/financeiro/novo?paciente=${id}`, mas essa rota não existe no `App.tsx`.
-
-**Correção em `PatientDetail.tsx`:**
-- Substituir a navegação por um Dialog inline (igual ao da página Financeiro).
-- O formulário já terá o `patient_id` pré-preenchido.
-- Campos: data, valor, forma de pagamento, observação.
-- Após salvar, recarregar os dados com `fetchAll()`.
+### 4.4 Identificacao Visual por Cor
+- Nos cards de atendimento do calendario: borda lateral colorida com a cor do profissional
+- Na visao diaria: tag com nome e cor do profissional
+- Na lista financeira: indicador de cor do profissional
 
 ---
 
-## Arquivos Modificados
+## Fase 5: Logica de Dados no Frontend
 
-1. `src/pages/PatientDetail.tsx` — Bugs 1, 7; Features 6a, 6b
-2. `src/pages/Patients.tsx` — Feature 2
-3. `src/pages/Appointments.tsx` — Features 4, 5
+### 5.1 AuthContext atualizado
+- Apos login, buscar `profiles` e `user_roles` do usuario
+- Expor: `role`, `profile`, `isAdmin`, `contaPrincipalId`
 
-Nenhuma alteração de banco de dados necessária.
+### 5.2 Queries condicionais
+- Admin: consultas filtram por `conta_principal_id`
+- Profissional: consultas filtram por `user_id` (como hoje)
+
+### 5.3 Inserts atualizados
+- Ao criar paciente/atendimento/recebivel: preencher `conta_principal_id` automaticamente
+- Ao criar atendimento: preencher `profissional_id = user.id`
+
+### 5.4 Restricoes de UI
+- Profissional: esconder menu "Financeiro" (global) e "Profissionais"
+- Profissional: na aba financeira do paciente, ver apenas seus proprios recebíveis
+
+---
+
+## Arquivos a Criar/Modificar
+
+| Arquivo | Acao |
+|---------|------|
+| Migracao SQL | Criar tabelas profiles, user_roles, invitations + alterar 6 tabelas existentes + novas RLS |
+| `supabase/functions/invite-professional/index.ts` | Criar edge function |
+| `supabase/functions/accept-invitation/index.ts` | Criar edge function |
+| `src/contexts/AuthContext.tsx` | Adicionar role, profile, isAdmin, contaPrincipalId |
+| `src/pages/Professionals.tsx` | Criar pagina de gestao |
+| `src/pages/Login.tsx` | Adicionar fluxo de convite (signup com token) |
+| `src/components/AppSidebar.tsx` | Menu condicional por role |
+| `src/components/AppLayout.tsx` | Mostrar nome do profissional no header |
+| `src/pages/Patients.tsx` | Query por conta_principal_id para admin |
+| `src/pages/PatientDetail.tsx` | Preencher conta_principal_id nos inserts |
+| `src/pages/PatientForm.tsx` | Preencher conta_principal_id |
+| `src/pages/Appointments.tsx` | Filtro por profissional, cor nos cards, query condicional |
+| `src/pages/Financial.tsx` | Filtro por profissional, visibilidade condicional |
+| `src/types/index.ts` | Novos tipos Profile, Invitation, UserRole |
+| `src/App.tsx` | Nova rota /profissionais |
+
+---
+
+## Ordem de Implementacao
+
+1. Migracao SQL (tabelas, funcoes, RLS)
+2. Edge functions (invite + accept)
+3. AuthContext (role/profile)
+4. Tipos TypeScript
+5. Pagina de Profissionais
+6. Login com fluxo de convite
+7. Sidebar condicional
+8. Queries condicionais em Pacientes, Atendimentos, Financeiro
+9. Identificacao visual por cor
+10. Testes
 
