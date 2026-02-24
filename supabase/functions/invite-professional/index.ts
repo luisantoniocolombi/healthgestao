@@ -31,16 +31,15 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await supabaseUser.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
+    const { data: userData, error: userError } = await supabaseUser.auth.getUser();
+    if (userError || !userData?.user) {
       return new Response(JSON.stringify({ error: "Token inválido" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const userId = claimsData.claims.sub;
+    const userId = userData.user.id;
 
     // Verify user is admin
     const { data: roleData } = await supabaseAdmin
@@ -67,7 +66,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Check for existing pending invitation
+    const inviteToken = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    // Check for existing pending invitation — update it instead of blocking
     const { data: existing } = await supabaseAdmin
       .from("invitations")
       .select("id")
@@ -76,36 +78,52 @@ Deno.serve(async (req) => {
       .eq("status", "pendente")
       .maybeSingle();
 
+    let invitation;
+
     if (existing) {
-      return new Response(
-        JSON.stringify({ error: "Já existe um convite pendente para este e-mail" }),
-        { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+      const { data, error: updateError } = await supabaseAdmin
+        .from("invitations")
+        .update({
+          token: inviteToken,
+          nome_profissional: nome || null,
+          cor_identificacao: cor_identificacao || "#3b82f6",
+          expires_at: expiresAt,
+        })
+        .eq("id", existing.id)
+        .select()
+        .single();
 
-    // Generate unique token
-    const inviteToken = crypto.randomUUID();
+      if (updateError) {
+        console.error("Update error:", updateError);
+        return new Response(JSON.stringify({ error: "Erro ao atualizar convite" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      invitation = data;
+    } else {
+      const { data, error: insertError } = await supabaseAdmin
+        .from("invitations")
+        .insert({
+          admin_id: userId,
+          email,
+          nome_profissional: nome || null,
+          cor_identificacao: cor_identificacao || "#3b82f6",
+          token: inviteToken,
+          status: "pendente",
+          expires_at: expiresAt,
+        })
+        .select()
+        .single();
 
-    const { data: invitation, error: insertError } = await supabaseAdmin
-      .from("invitations")
-      .insert({
-        admin_id: userId,
-        email,
-        nome_profissional: nome || null,
-        cor_identificacao: cor_identificacao || "#3b82f6",
-        token: inviteToken,
-        status: "pendente",
-        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
-      })
-      .select()
-      .single();
-
-    if (insertError) {
-      console.error("Insert error:", insertError);
-      return new Response(JSON.stringify({ error: "Erro ao criar convite" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      if (insertError) {
+        console.error("Insert error:", insertError);
+        return new Response(JSON.stringify({ error: "Erro ao criar convite" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      invitation = data;
     }
 
     const origin = body.origin || req.headers.get("origin") || "";
