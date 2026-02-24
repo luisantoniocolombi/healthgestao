@@ -1,5 +1,6 @@
-import { Users, CalendarDays, DollarSign } from "lucide-react";
+import { Users, CalendarDays, DollarSign, UserCog } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Sidebar,
   SidebarContent,
@@ -11,13 +12,20 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
-const menuItems = [
+const baseItems = [
   { title: "Pacientes", url: "/pacientes", icon: Users },
   { title: "Atendimentos", url: "/atendimentos", icon: CalendarDays },
+];
+
+const adminItems = [
   { title: "Financeiro", url: "/financeiro", icon: DollarSign },
+  { title: "Profissionais", url: "/profissionais", icon: UserCog },
 ];
 
 export function AppSidebar() {
+  const { isAdmin } = useAuth();
+  const menuItems = isAdmin ? [...baseItems, ...adminItems] : baseItems;
+
   return (
     <Sidebar>
       <SidebarContent>
