@@ -1,34 +1,96 @@
 
 
-# Problema: Seu usuário existente não tem perfil nem role
+# Diagnóstico: Bugs no Fluxo de Convite de Profissional
 
-As tabelas `profiles` e `user_roles` retornam **404** (não existem no banco). Isso significa que a migração SQL da Fase 1 ainda não foi executada, ou falhou.
+Encontrei **4 problemas distintos** que precisam ser corrigidos:
 
-Mesmo que as tabelas existam, o trigger `on_auth_user_created` só dispara para **novos** cadastros. Seu usuário já existia antes da migração, então ele não tem entrada em `profiles` nem em `user_roles`.
+---
 
-## Plano de Correção
+## Bug 1: Recursão infinita nas políticas RLS de `profiles` (CRÍTICO)
 
-### Passo 1: Verificar se as tabelas existem
-Executar uma query para confirmar se `profiles` e `user_roles` foram criadas.
+A política "Admins can read all profiles in their account" contém uma subconsulta direta na própria tabela `profiles`:
 
-### Passo 2: Inserir dados do usuário existente
-Executar uma migração SQL que:
+```sql
+conta_principal_id = (
+  SELECT profiles_1.conta_principal_id
+  FROM profiles profiles_1
+  WHERE profiles_1.id = auth.uid()
+)
+```
 
-1. Cria o perfil do seu usuário na tabela `profiles`:
-   - `id` = seu user_id (`b1914198-00fe-491c-9276-8520db94ef16`)
-   - `nome` = extraído do email
-   - `conta_principal_id` = o próprio id (pois é admin)
-   - `cor_identificacao` = cor padrão
+Isso causa **recursão infinita** porque o PostgreSQL precisa avaliar a policy para executar a subconsulta, que por sua vez precisa avaliar a policy novamente. É o erro `42P17` que aparece em todas as requisições à tabela `profiles`.
 
-2. Insere o role `admin` na tabela `user_roles`:
-   - `user_id` = seu user_id
-   - `role` = 'admin'
+**Correção:** Substituir a subconsulta pela função `get_my_conta_principal_id()` que já existe e usa `SECURITY DEFINER` (bypassa RLS):
 
-Ambos os inserts usarão `ON CONFLICT DO NOTHING` para segurança.
+```sql
+DROP POLICY "Admins can read all profiles in their account" ON profiles;
+CREATE POLICY "Admins can read all profiles in their account"
+  ON profiles FOR SELECT
+  USING (conta_principal_id = get_my_conta_principal_id());
 
-### Passo 3: Verificar o AuthContext
-O `AuthContext` já busca `profiles` e `user_roles` após login. Com os dados inseridos, o sistema reconhecerá automaticamente que você é admin e exibirá os menus corretos (Financeiro, Profissionais).
+DROP POLICY "Admins can update profiles in their account" ON profiles;
+CREATE POLICY "Admins can update profiles in their account"
+  ON profiles FOR UPDATE
+  USING (has_role(auth.uid(), 'admin') AND conta_principal_id = get_my_conta_principal_id());
+```
 
-### Arquivos modificados
-- Apenas uma migração SQL (nenhum arquivo de código alterado)
+---
+
+## Bug 2: Nome do campo incorreto na chamada do Edge Function
+
+O `Professionals.tsx` envia `nome_profissional` no body:
+```js
+body: { email, nome_profissional: nome, cor_identificacao: cor }
+```
+
+Mas o Edge Function `invite-professional` extrai `nome`:
+```js
+const { email, nome, cor_identificacao } = await req.json();
+```
+
+**Correção:** Alterar o Edge Function para ler `nome_profissional` do body (ou vice-versa). A melhor opção é ajustar o frontend para enviar `nome` em vez de `nome_profissional`, mantendo consistência com a function.
+
+---
+
+## Bug 3: Link de convite gerado com URL incorreta
+
+O Edge Function usa `req.headers.get("origin")` para construir o link. Quando chamado via `supabase.functions.invoke()`, o header `origin` aponta para a URL do Supabase Functions, não para a URL da aplicação.
+
+**Correção:** Passar a URL de origem explicitamente no body da requisição a partir do frontend:
+
+```js
+// Professionals.tsx
+body: { email, nome, cor_identificacao: cor, origin: window.location.origin }
+```
+
+```js
+// Edge Function
+const origin = body.origin || req.headers.get("origin") || "";
+const inviteLink = `${origin}/signup?token=${inviteToken}`;
+```
+
+---
+
+## Bug 4: Rota `/signup` bloqueada para usuários logados
+
+No `App.tsx`, a rota `/signup` está envolvida em `AuthRoute`, que redireciona usuários logados para `/pacientes`. Se um profissional já estiver logado e clicar no link de convite, ele será redirecionado sem processar o token.
+
+**Correção:** Remover o `AuthRoute` da rota `/signup`, permitindo que usuários acessem a página independentemente do estado de autenticação. A página `Signup.tsx` já tem lógica para lidar com tokens.
+
+---
+
+## Sobre o envio de email
+
+O Edge Function **não envia email** — ele apenas gera o link e retorna para o admin copiar manualmente. Isso é intencional no design atual. Se desejar envio automático por email, será necessário configurar um serviço de email (como Resend) em uma etapa futura.
+
+---
+
+## Resumo das alterações
+
+| Arquivo | Alteração |
+|---|---|
+| **Migração SQL** | Recriar policies de `profiles` usando `get_my_conta_principal_id()` |
+| **`src/pages/Professionals.tsx`** | Corrigir campo `nome_profissional` → `nome`; passar `origin` no body |
+| **`supabase/functions/invite-professional/index.ts`** | Ler `origin` do body da requisição |
+| **`src/App.tsx`** | Remover `AuthRoute` wrapper da rota `/signup` |
 
