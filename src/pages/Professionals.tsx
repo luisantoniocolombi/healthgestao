@@ -86,7 +86,7 @@ export default function Professionals() {
       if (!session) throw new Error("Não autenticado");
 
       const res = await supabase.functions.invoke("invite-professional", {
-        body: { email, nome, cor_identificacao: cor, origin: window.location.origin },
+        body: { email, nome, cor_identificacao: cor, origin: "https://healthgestao.lovable.app" },
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
 
