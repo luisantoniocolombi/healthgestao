@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAccountProfiles } from "@/hooks/use-account-profiles";
 import { Patient, Appointment } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,6 +67,7 @@ function useSpeechRecognition() {
 // ========== APPOINTMENTS PAGE ==========
 export default function Appointments() {
   const { user } = useAuth();
+  const { profileMap, isAdmin } = useAccountProfiles();
   const navigate = useNavigate();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -79,21 +81,28 @@ export default function Appointments() {
     const monthStart = format(startOfMonth(currentMonth), "yyyy-MM-dd");
     const monthEnd = format(endOfMonth(currentMonth), "yyyy-MM-dd");
 
-    const [apptRes, patRes] = await Promise.all([
-      supabase.from("appointments").select("*, patients(nome_completo)")
-        .eq("user_id", user.id).eq("archived", false)
+    const apptQuery = supabase.from("appointments").select("*, patients(nome_completo)")
+        .eq("archived", false)
         .gte("data_atendimento", monthStart).lte("data_atendimento", monthEnd)
-        .order("data_atendimento"),
-      supabase.from("patients").select("id, nome_completo")
-        .eq("user_id", user.id).eq("archived", false).order("nome_completo"),
-    ]);
+        .order("data_atendimento");
+
+    const patQuery = supabase.from("patients").select("id, nome_completo")
+        .eq("archived", false).order("nome_completo");
+
+    // Professional sees only own; admin sees all via RLS
+    if (!isAdmin) {
+      apptQuery.eq("user_id", user.id);
+      patQuery.eq("user_id", user.id);
+    }
+
+    const [apptRes, patRes] = await Promise.all([apptQuery, patQuery]);
 
     setAppointments((apptRes.data || []) as Appointment[]);
     setPatients((patRes.data || []) as Patient[]);
     setLoading(false);
   };
 
-  useEffect(() => { fetchData(); }, [user, currentMonth]);
+  useEffect(() => { fetchData(); }, [user, currentMonth, isAdmin]);
 
   const days = eachDayOfInterval({
     start: startOfWeek(startOfMonth(currentMonth), { locale: ptBR }),
@@ -160,22 +169,26 @@ export default function Appointments() {
                   <span className={`text-xs ${isToday ? "font-bold text-primary" : "text-muted-foreground"}`}>
                     {format(day, "d")}
                   </span>
-                  {dayAppts.slice(0, 2).map(a => (
-                    <div
-                      key={a.id}
-                      className={`text-[10px] truncate rounded px-1 mt-0.5 cursor-pointer ${
-                        a.status === "cancelado"
-                          ? "bg-destructive/10 text-destructive line-through"
-                          : a.status === "agendado"
-                            ? "bg-blue-500/10 text-blue-600"
-                            : "bg-primary/10 text-primary"
-                      }`}
-                      onClick={(e) => { e.stopPropagation(); navigate(`/atendimentos/${a.id}`); }}
-                    >
-                      {a.hora && `${a.hora.slice(0, 5)} `}
-                      {(a as any).patients?.nome_completo || "Paciente"}
-                    </div>
-                  ))}
+                  {dayAppts.slice(0, 2).map(a => {
+                    const profColor = isAdmin ? profileMap[a.user_id]?.cor_identificacao : undefined;
+                    return (
+                      <div
+                        key={a.id}
+                        className={`text-[10px] truncate rounded px-1 mt-0.5 cursor-pointer ${
+                          a.status === "cancelado"
+                            ? "bg-destructive/10 text-destructive line-through"
+                            : a.status === "agendado"
+                              ? "bg-blue-500/10 text-blue-600"
+                              : "bg-primary/10 text-primary"
+                        }`}
+                        style={profColor ? { borderLeft: `3px solid ${profColor}` } : undefined}
+                        onClick={(e) => { e.stopPropagation(); navigate(`/atendimentos/${a.id}`); }}
+                      >
+                        {a.hora && `${a.hora.slice(0, 5)} `}
+                        {(a as any).patients?.nome_completo || "Paciente"}
+                      </div>
+                    );
+                  })}
                   {dayAppts.length > 2 && (
                     <span className="text-[10px] text-muted-foreground">+{dayAppts.length - 2}</span>
                   )}
@@ -202,21 +215,29 @@ export default function Appointments() {
             if (dayAppts.length === 0) return <p className="text-sm text-muted-foreground">Nenhum atendimento neste dia</p>;
             return dayAppts
               .sort((a, b) => (a.hora || "").localeCompare(b.hora || ""))
-              .map(a => (
-                <div
-                  key={a.id}
-                  className="p-3 border rounded-lg flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors"
-                  onClick={() => navigate(`/atendimentos/${a.id}`)}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-mono text-muted-foreground w-12">{a.hora ? a.hora.slice(0, 5) : "--:--"}</span>
-                    <span className="text-sm font-medium">{(a as any).patients?.nome_completo || "Paciente"}</span>
+              .map(a => {
+                const profColor = isAdmin ? profileMap[a.user_id]?.cor_identificacao : undefined;
+                const profNome = isAdmin ? profileMap[a.user_id]?.nome : undefined;
+                return (
+                  <div
+                    key={a.id}
+                    className="p-3 border rounded-lg flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors"
+                    style={profColor ? { borderLeftWidth: '3px', borderLeftColor: profColor } : undefined}
+                    onClick={() => navigate(`/atendimentos/${a.id}`)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-mono text-muted-foreground w-12">{a.hora ? a.hora.slice(0, 5) : "--:--"}</span>
+                      <div>
+                        <span className="text-sm font-medium">{(a as any).patients?.nome_completo || "Paciente"}</span>
+                        {profNome && <p className="text-xs text-muted-foreground">{profNome}</p>}
+                      </div>
+                    </div>
+                    <Badge variant={a.status === "realizado" ? "default" : a.status === "cancelado" ? "destructive" : "secondary"}>
+                      {a.status}
+                    </Badge>
                   </div>
-                  <Badge variant={a.status === "realizado" ? "default" : a.status === "cancelado" ? "destructive" : "secondary"}>
-                    {a.status}
-                  </Badge>
-                </div>
-              ));
+                );
+              });
           })()}
         </CardContent>
       </Card>

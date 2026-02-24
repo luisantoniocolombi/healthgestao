@@ -444,6 +444,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_my_conta_principal_id: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -451,6 +452,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_same_account: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "profissional"

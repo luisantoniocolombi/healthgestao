@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAccountProfiles } from "@/hooks/use-account-profiles";
 import { Patient } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,8 +14,9 @@ import { toast } from "sonner";
 
 export default function Patients() {
   const { user } = useAuth();
+  const { profileMap, isAdmin } = useAccountProfiles();
   const navigate = useNavigate();
-  const [patients, setPatients] = useState<Patient[]>([]);
+  const [patients, setPatients] = useState<(Patient & { _prof_color?: string; _prof_nome?: string })[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
@@ -26,9 +28,13 @@ export default function Patients() {
     let query = supabase
       .from("patients")
       .select("*")
-      .eq("user_id", user.id)
       .eq("archived", isArchived)
       .order("nome_completo");
+
+    // Professional sees only own patients; admin sees all via RLS
+    if (!isAdmin) {
+      query = query.eq("user_id", user.id);
+    }
 
     if (!isArchived && statusFilter !== "todos") {
       query = query.eq("status", statusFilter);
@@ -39,13 +45,18 @@ export default function Patients() {
       toast.error("Erro ao carregar pacientes");
       return;
     }
-    setPatients((data || []) as Patient[]);
+    const enriched = ((data || []) as Patient[]).map(p => ({
+      ...p,
+      _prof_color: profileMap[p.user_id]?.cor_identificacao,
+      _prof_nome: profileMap[p.user_id]?.nome,
+    }));
+    setPatients(enriched);
     setLoading(false);
   };
 
   useEffect(() => {
     fetchPatients();
-  }, [user, statusFilter]);
+  }, [user, statusFilter, profileMap]);
 
   const filtered = patients.filter((p) => {
     const term = search.toLowerCase();
@@ -104,16 +115,24 @@ export default function Patients() {
           {filtered.map((patient) => (
             <Card
               key={patient.id}
-              className="cursor-pointer hover:shadow-md transition-shadow"
+              className="cursor-pointer hover:shadow-md transition-shadow relative overflow-hidden"
               onClick={() => navigate(`/pacientes/${patient.id}`)}
             >
-              <CardContent className="p-4 flex items-center justify-between">
+              {isAdmin && patient._prof_color && (
+                <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: patient._prof_color }} />
+              )}
+              <CardContent className={`p-4 flex items-center justify-between ${isAdmin && patient._prof_color ? "pl-5" : ""}`}>
                 <div className="space-y-1">
                   <p className="font-medium text-foreground">{patient.nome_completo}</p>
                   <p className="text-sm text-muted-foreground">{patient.telefone}</p>
                   {patient.responsavel_nome && (
                     <p className="text-xs text-muted-foreground">
                       Responsável: {patient.responsavel_nome}
+                    </p>
+                  )}
+                  {isAdmin && patient._prof_nome && (
+                    <p className="text-xs text-muted-foreground">
+                      Profissional: {patient._prof_nome}
                     </p>
                   )}
                 </div>
