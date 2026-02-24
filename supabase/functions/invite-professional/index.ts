@@ -57,7 +57,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { email, nome, cor_identificacao } = await req.json();
+    const body = await req.json();
+    const { email, nome, cor_identificacao } = body;
 
     if (!email) {
       return new Response(JSON.stringify({ error: "E-mail é obrigatório" }), {
@@ -107,7 +108,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const origin = req.headers.get("origin") || req.headers.get("referer")?.replace(/\/$/, "") || "";
+    const origin = body.origin || req.headers.get("origin") || "";
     const inviteLink = `${origin}/signup?token=${inviteToken}`;
 
     return new Response(
