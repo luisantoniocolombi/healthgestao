@@ -74,10 +74,10 @@ export default function PatientDetail() {
 
   const handleSave = async () => {
     if (!id || !user) return;
-    const { nome_completo, telefone, responsavel_nome, endereco, doenca_principal, status, observacoes_gerais } = form;
+    const { nome_completo, telefone, responsavel_nome, endereco, doenca_principal, status, observacoes_gerais, convenio } = form;
     const { error } = await supabase
       .from("patients")
-      .update({ nome_completo, telefone, responsavel_nome, endereco, doenca_principal, status, observacoes_gerais, updated_by: user.id })
+      .update({ nome_completo, telefone, responsavel_nome, endereco, doenca_principal, status, observacoes_gerais, convenio, updated_by: user.id })
       .eq("id", id);
     if (error) { toast.error("Erro ao salvar"); return; }
     toast.success("Paciente atualizado!");
@@ -255,6 +255,17 @@ export default function PatientDetail() {
                 <div className="space-y-2">
                   <Label>Doença Principal</Label>
                   <Input value={form.doenca_principal || ""} onChange={(e) => update("doenca_principal", e.target.value)} disabled={!editing} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Convênio</Label>
+                  <Select value={form.convenio || ""} onValueChange={(v) => update("convenio", v)} disabled={!editing}>
+                    <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="particular">Particular</SelectItem>
+                      <SelectItem value="unimed">Unimed</SelectItem>
+                      <SelectItem value="outros">Outros</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>Status</Label>
@@ -449,7 +460,10 @@ export default function PatientDetail() {
                       <div key={r.id} className="p-3 border rounded-lg flex items-center justify-between">
                         <div>
                           <p className="text-sm font-medium">R$ {Number(r.valor).toFixed(2)}</p>
-                          <p className="text-xs text-muted-foreground">{format(new Date(r.data_cobranca + "T00:00:00"), "dd/MM/yyyy")}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {format(new Date(r.data_cobranca + "T00:00:00"), "dd/MM/yyyy")}
+                            {(r as any).gerar_nfe && <Badge variant="outline" className="ml-2 text-[10px]">NFe</Badge>}
+                          </p>
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge variant={r.status_pagamento === "pago" ? "default" : r.status_pagamento === "pendente" ? "secondary" : "destructive"}>

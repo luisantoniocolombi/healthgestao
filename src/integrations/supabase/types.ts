@@ -20,9 +20,12 @@ export type Database = {
           created_at: string
           created_by: string | null
           data_atendimento: string
+          gerar_nfe: boolean
           hora: string | null
           id: string
           patient_id: string
+          percentual_parceiro: number | null
+          profissional_parceiro_id: string | null
           status: string
           texto_prontuario: string | null
           transcription_confidence: number | null
@@ -38,9 +41,12 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           data_atendimento: string
+          gerar_nfe?: boolean
           hora?: string | null
           id?: string
           patient_id: string
+          percentual_parceiro?: number | null
+          profissional_parceiro_id?: string | null
           status?: string
           texto_prontuario?: string | null
           transcription_confidence?: number | null
@@ -56,9 +62,12 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           data_atendimento?: string
+          gerar_nfe?: boolean
           hora?: string | null
           id?: string
           patient_id?: string
+          percentual_parceiro?: number | null
+          profissional_parceiro_id?: string | null
           status?: string
           texto_prontuario?: string | null
           transcription_confidence?: number | null
@@ -268,6 +277,7 @@ export type Database = {
       patients: {
         Row: {
           archived: boolean
+          convenio: string | null
           created_at: string
           created_by: string | null
           doenca_principal: string | null
@@ -285,6 +295,7 @@ export type Database = {
         }
         Insert: {
           archived?: boolean
+          convenio?: string | null
           created_at?: string
           created_by?: string | null
           doenca_principal?: string | null
@@ -302,6 +313,7 @@ export type Database = {
         }
         Update: {
           archived?: boolean
+          convenio?: string | null
           created_at?: string
           created_by?: string | null
           doenca_principal?: string | null
@@ -358,6 +370,7 @@ export type Database = {
           data_cobranca: string
           data_pagamento: string | null
           forma_pagamento: string | null
+          gerar_nfe: boolean
           id: string
           observacao: string | null
           origem: string
@@ -376,6 +389,7 @@ export type Database = {
           data_cobranca: string
           data_pagamento?: string | null
           forma_pagamento?: string | null
+          gerar_nfe?: boolean
           id?: string
           observacao?: string | null
           origem?: string
@@ -394,6 +408,7 @@ export type Database = {
           data_cobranca?: string
           data_pagamento?: string | null
           forma_pagamento?: string | null
+          gerar_nfe?: boolean
           id?: string
           observacao?: string | null
           origem?: string

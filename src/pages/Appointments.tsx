@@ -3,13 +3,14 @@ import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAccountProfiles } from "@/hooks/use-account-profiles";
-import { Patient, Appointment } from "@/types";
+import { Patient, Appointment, Profile } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { ArrowLeft, CalendarDays, Plus, Mic, MicOff, Copy, Check, RotateCcw, AlertTriangle, Trash2 } from "lucide-react";
@@ -249,6 +250,7 @@ export default function Appointments() {
 export function AppointmentForm() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
+  const { profileMap, isAdmin } = useAccountProfiles();
   const navigate = useNavigate();
   const params = new URLSearchParams(window.location.search);
 
@@ -262,6 +264,9 @@ export function AppointmentForm() {
     hora: "",
     texto_prontuario: "",
     status: "realizado" as string,
+    gerar_nfe: false,
+    profissional_parceiro_id: "",
+    percentual_parceiro: "50",
   });
 
   const [createReceivable, setCreateReceivable] = useState(false);
@@ -290,6 +295,9 @@ export function AppointmentForm() {
               hora: data.hora || "",
               texto_prontuario: data.texto_prontuario || "",
               status: data.status,
+              gerar_nfe: (data as any).gerar_nfe || false,
+              profissional_parceiro_id: (data as any).profissional_parceiro_id || "",
+              percentual_parceiro: String((data as any).percentual_parceiro || 50),
             });
           }
         });
@@ -302,8 +310,14 @@ export function AppointmentForm() {
     setLoading(true);
 
     const payload = {
-      ...form,
+      patient_id: form.patient_id,
+      data_atendimento: form.data_atendimento,
       hora: form.hora || null,
+      texto_prontuario: form.texto_prontuario,
+      status: form.status,
+      gerar_nfe: form.gerar_nfe,
+      profissional_parceiro_id: form.profissional_parceiro_id || null,
+      percentual_parceiro: form.profissional_parceiro_id ? parseFloat(form.percentual_parceiro) : null,
       user_id: user.id,
       updated_by: user.id,
     };
@@ -322,19 +336,56 @@ export function AppointmentForm() {
       appointmentId = data.id;
     }
 
-    // Create receivable if toggled
+    // Create receivable(s) if toggled
     if (createReceivable && receivableForm.valor && appointmentId) {
-      await supabase.from("receivables").insert({
-        user_id: user.id,
-        patient_id: form.patient_id,
-        appointment_id: appointmentId,
-        data_cobranca: form.data_atendimento,
-        valor: parseFloat(receivableForm.valor),
-        observacao: receivableForm.observacao || null,
-        origem: "atendimento",
-        created_by: user.id,
-        updated_by: user.id,
-      });
+      const totalValor = parseFloat(receivableForm.valor);
+      
+      if (form.profissional_parceiro_id) {
+        // Split: create 2 receivables
+        const pct = parseFloat(form.percentual_parceiro) / 100;
+        const valorParceiro = totalValor * pct;
+        const valorPrincipal = totalValor - valorParceiro;
+
+        await Promise.all([
+          supabase.from("receivables").insert({
+            user_id: user.id,
+            patient_id: form.patient_id,
+            appointment_id: appointmentId,
+            data_cobranca: form.data_atendimento,
+            valor: valorPrincipal,
+            observacao: receivableForm.observacao || null,
+            origem: "atendimento",
+            gerar_nfe: form.gerar_nfe,
+            created_by: user.id,
+            updated_by: user.id,
+          }),
+          supabase.from("receivables").insert({
+            user_id: form.profissional_parceiro_id,
+            patient_id: form.patient_id,
+            appointment_id: appointmentId,
+            data_cobranca: form.data_atendimento,
+            valor: valorParceiro,
+            observacao: `Parceiro - ${receivableForm.observacao || ""}`.trim(),
+            origem: "atendimento",
+            gerar_nfe: form.gerar_nfe,
+            created_by: user.id,
+            updated_by: user.id,
+          }),
+        ]);
+      } else {
+        await supabase.from("receivables").insert({
+          user_id: user.id,
+          patient_id: form.patient_id,
+          appointment_id: appointmentId,
+          data_cobranca: form.data_atendimento,
+          valor: totalValor,
+          observacao: receivableForm.observacao || null,
+          origem: "atendimento",
+          gerar_nfe: form.gerar_nfe,
+          created_by: user.id,
+          updated_by: user.id,
+        });
+      }
     }
 
     toast.success(id ? "Atendimento atualizado!" : "Atendimento salvo!");
@@ -460,6 +511,41 @@ export function AppointmentForm() {
                 </div>
               )}
             </div>
+
+            {/* NFe checkbox */}
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="gerar_nfe"
+                checked={form.gerar_nfe}
+                onCheckedChange={(checked) => setForm(prev => ({ ...prev, gerar_nfe: !!checked }))}
+              />
+              <Label htmlFor="gerar_nfe">Gerar NFe</Label>
+            </div>
+
+            {/* Partner professional */}
+            {Object.keys(profileMap).length > 0 && (
+              <div className="space-y-2 p-4 border rounded-lg">
+                <Label>Profissional Parceiro (opcional)</Label>
+                <Select value={form.profissional_parceiro_id} onValueChange={(v) => setForm(prev => ({ ...prev, profissional_parceiro_id: v === "none" ? "" : v }))}>
+                  <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhum</SelectItem>
+                    {Object.entries(profileMap)
+                      .filter(([pid]) => pid !== user?.id)
+                      .map(([pid, prof]) => (
+                        <SelectItem key={pid} value={pid}>{prof.nome}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                {form.profissional_parceiro_id && (
+                  <div className="space-y-2">
+                    <Label>% Parceiro</Label>
+                    <Input type="number" min="1" max="99" value={form.percentual_parceiro} onChange={(e) => setForm(prev => ({ ...prev, percentual_parceiro: e.target.value }))} />
+                    <p className="text-xs text-muted-foreground">Você: {100 - Number(form.percentual_parceiro)}% | Parceiro: {form.percentual_parceiro}%</p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Toggle cobrança */}
             {!id && (

@@ -136,9 +136,12 @@ export default function Patients() {
                     </p>
                   )}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   {patient.archived && (
                     <Badge variant="outline" className="text-muted-foreground">Arquivado</Badge>
+                  )}
+                  {(patient as any).convenio && (
+                    <Badge variant="outline">{(patient as any).convenio}</Badge>
                   )}
                   <Badge variant={patient.status === "ativo" ? "default" : "secondary"}>
                     {patient.status === "ativo" ? "Ativo" : "Inativo"}

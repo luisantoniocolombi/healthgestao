@@ -22,6 +22,7 @@ export default function PatientForm() {
     responsavel_nome: "",
     doenca_principal: "",
     observacoes_gerais: "",
+    convenio: "",
     status: "ativo",
   });
 
@@ -103,6 +104,17 @@ export default function PatientForm() {
                   value={form.doenca_principal}
                   onChange={(e) => update("doenca_principal", e.target.value)}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="convenio">Convênio</Label>
+                <Select value={form.convenio} onValueChange={(v) => update("convenio", v)}>
+                  <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="particular">Particular</SelectItem>
+                    <SelectItem value="unimed">Unimed</SelectItem>
+                    <SelectItem value="outros">Outros</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
