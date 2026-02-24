@@ -8,6 +8,7 @@ export interface Patient {
   responsavel_nome?: string;
   doenca_principal?: string;
   observacoes_gerais?: string;
+  convenio?: string;
   status: 'ativo' | 'inativo';
   archived: boolean;
   created_at: string;
@@ -63,6 +64,9 @@ export interface Appointment {
   transcription_engine?: string;
   transcription_confidence?: number;
   transcription_created_at?: string;
+  gerar_nfe: boolean;
+  profissional_parceiro_id?: string;
+  percentual_parceiro?: number;
   status: 'agendado' | 'realizado' | 'cancelado';
   archived: boolean;
   created_at: string;
@@ -82,6 +86,7 @@ export interface Receivable {
   data_pagamento?: string;
   forma_pagamento?: string;
   observacao?: string;
+  gerar_nfe: boolean;
   origem: 'manual' | 'atendimento';
   archived: boolean;
   created_at: string;

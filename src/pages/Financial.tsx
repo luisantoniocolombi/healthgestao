@@ -24,6 +24,7 @@ export default function Financial() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("todos");
+  const [nfeFilter, setNfeFilter] = useState("todos");
   const [search, setSearch] = useState("");
   const [currentMonth, setCurrentMonth] = useState(format(new Date(), "yyyy-MM"));
 
@@ -67,6 +68,8 @@ export default function Financial() {
 
   const filtered = receivables.filter(r => {
     if (statusFilter !== "todos" && r.status_pagamento !== statusFilter) return false;
+    if (nfeFilter === "nfe" && !(r as any).gerar_nfe) return false;
+    if (nfeFilter === "sem_nfe" && (r as any).gerar_nfe) return false;
     if (search) {
       const name = (r as any).patients?.nome_completo?.toLowerCase() || "";
       if (!name.includes(search.toLowerCase())) return false;
@@ -78,6 +81,8 @@ export default function Financial() {
   const totalRecebido = filtered.filter(r => r.status_pagamento === "pago").reduce((s, r) => s + Number(r.valor), 0);
   const totalCancelado = filtered.filter(r => r.status_pagamento === "cancelado").reduce((s, r) => s + Number(r.valor), 0);
   const ticketMedio = filtered.length > 0 ? (totalReceber + totalRecebido) / filtered.filter(r => r.status_pagamento !== "cancelado").length : 0;
+  const totalNfe = filtered.filter(r => (r as any).gerar_nfe && r.status_pagamento !== "cancelado").reduce((s, r) => s + Number(r.valor), 0);
+  const countNfe = filtered.filter(r => (r as any).gerar_nfe && r.status_pagamento !== "cancelado").length;
 
   const markAsPaid = async (id: string) => {
     const { error } = await supabase.from("receivables").update({
@@ -184,12 +189,13 @@ export default function Financial() {
       </div>
 
       {/* Dashboard Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
         <Card><CardContent className="p-4 text-center"><p className="text-xs text-muted-foreground">Recebíveis</p><p className="text-2xl font-bold">{filtered.length}</p></CardContent></Card>
         <Card><CardContent className="p-4 text-center"><p className="text-xs text-muted-foreground">A Receber</p><p className="text-2xl font-bold text-warning">R$ {totalReceber.toFixed(2)}</p></CardContent></Card>
         <Card><CardContent className="p-4 text-center"><p className="text-xs text-muted-foreground">Recebido</p><p className="text-2xl font-bold text-success">R$ {totalRecebido.toFixed(2)}</p></CardContent></Card>
         <Card><CardContent className="p-4 text-center"><p className="text-xs text-muted-foreground">Cancelados</p><p className="text-2xl font-bold text-destructive">R$ {totalCancelado.toFixed(2)}</p></CardContent></Card>
         <Card><CardContent className="p-4 text-center"><p className="text-xs text-muted-foreground">Ticket Médio</p><p className="text-2xl font-bold">R$ {(ticketMedio || 0).toFixed(2)}</p></CardContent></Card>
+        <Card><CardContent className="p-4 text-center"><p className="text-xs text-muted-foreground">NFe ({countNfe})</p><p className="text-2xl font-bold text-primary">R$ {totalNfe.toFixed(2)}</p></CardContent></Card>
       </div>
 
       {/* Filters */}
@@ -206,6 +212,14 @@ export default function Financial() {
             <SelectItem value="pendente">Pendente</SelectItem>
             <SelectItem value="pago">Pago</SelectItem>
             <SelectItem value="cancelado">Cancelado</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={nfeFilter} onValueChange={setNfeFilter}>
+          <SelectTrigger className="w-full sm:w-36"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">NFe: Todos</SelectItem>
+            <SelectItem value="nfe">Somente NFe</SelectItem>
+            <SelectItem value="sem_nfe">Sem NFe</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -229,6 +243,7 @@ export default function Financial() {
                     <span>{format(new Date(r.data_cobranca), "dd/MM/yyyy")}</span>
                     <span className="font-semibold text-foreground">R$ {Number(r.valor).toFixed(2)}</span>
                     {r.forma_pagamento && <span>{r.forma_pagamento}</span>}
+                    {(r as any).gerar_nfe && <Badge variant="outline" className="text-[10px]">NFe</Badge>}
                   </div>
                   {r.observacao && <p className="text-xs text-muted-foreground">{r.observacao}</p>}
                   {isAdmin && profileMap[r.user_id] && (
