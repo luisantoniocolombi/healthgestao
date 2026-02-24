@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAccountProfiles } from "@/hooks/use-account-profiles";
 import { Patient, Receivable } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +18,7 @@ import { ptBR } from "date-fns/locale";
 
 export default function Financial() {
   const { user } = useAuth();
+  const { profileMap, isAdmin } = useAccountProfiles();
   const navigate = useNavigate();
   const [receivables, setReceivables] = useState<Receivable[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -41,21 +43,27 @@ export default function Financial() {
     const start = format(new Date(year, month - 1, 1), "yyyy-MM-dd");
     const end = format(endOfMonth(new Date(year, month - 1, 1)), "yyyy-MM-dd");
 
-    const [recRes, patRes] = await Promise.all([
-      supabase.from("receivables").select("*, patients(nome_completo)")
-        .eq("user_id", user.id).eq("archived", false)
+    const recQuery = supabase.from("receivables").select("*, patients(nome_completo)")
+        .eq("archived", false)
         .gte("data_cobranca", start).lte("data_cobranca", end)
-        .order("data_cobranca", { ascending: false }),
-      supabase.from("patients").select("id, nome_completo")
-        .eq("user_id", user.id).eq("archived", false).order("nome_completo"),
-    ]);
+        .order("data_cobranca", { ascending: false });
+
+    const patQuery = supabase.from("patients").select("id, nome_completo")
+        .eq("archived", false).order("nome_completo");
+
+    if (!isAdmin) {
+      recQuery.eq("user_id", user.id);
+      patQuery.eq("user_id", user.id);
+    }
+
+    const [recRes, patRes] = await Promise.all([recQuery, patQuery]);
 
     setReceivables((recRes.data || []) as Receivable[]);
     setPatients((patRes.data || []) as Patient[]);
     setLoading(false);
   };
 
-  useEffect(() => { fetchData(); }, [user, currentMonth]);
+  useEffect(() => { fetchData(); }, [user, currentMonth, isAdmin]);
 
   const filtered = receivables.filter(r => {
     if (statusFilter !== "todos" && r.status_pagamento !== statusFilter) return false;
@@ -211,8 +219,11 @@ export default function Financial() {
         <div className="space-y-2">
           {filtered.map(r => (
             <Card key={r.id}>
-              <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="space-y-1 flex-1">
+              <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative overflow-hidden">
+                {isAdmin && profileMap[r.user_id] && (
+                  <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: profileMap[r.user_id].cor_identificacao }} />
+                )}
+                <div className={`space-y-1 flex-1 ${isAdmin && profileMap[r.user_id] ? "pl-3" : ""}`}>
                   <p className="font-medium">{(r as any).patients?.nome_completo || "—"}</p>
                   <div className="flex items-center gap-3 text-sm text-muted-foreground">
                     <span>{format(new Date(r.data_cobranca), "dd/MM/yyyy")}</span>
@@ -220,6 +231,9 @@ export default function Financial() {
                     {r.forma_pagamento && <span>{r.forma_pagamento}</span>}
                   </div>
                   {r.observacao && <p className="text-xs text-muted-foreground">{r.observacao}</p>}
+                  {isAdmin && profileMap[r.user_id] && (
+                    <p className="text-xs text-muted-foreground">Profissional: {profileMap[r.user_id].nome}</p>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant={
