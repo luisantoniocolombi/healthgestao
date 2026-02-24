@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Mic, UserPlus } from "lucide-react";
+import { Mic, UserPlus, LogIn } from "lucide-react";
 
 interface InvitationData {
   id: string;
@@ -28,7 +28,10 @@ export default function Signup() {
   const [invitation, setInvitation] = useState<InvitationData | null>(null);
   const [loadingInvite, setLoadingInvite] = useState(!!token);
   const [inviteError, setInviteError] = useState("");
+  const [isLoginMode, setIsLoginMode] = useState(false);
+  const autoAcceptAttempted = useRef(false);
 
+  // Fetch invitation data
   useEffect(() => {
     if (!token) {
       setLoadingInvite(false);
@@ -56,39 +59,126 @@ export default function Signup() {
     fetchInvitation();
   }, [token]);
 
+  // Auto-accept invitation when returning from email confirmation with active session
+  useEffect(() => {
+    if (!token || !invitation || autoAcceptAttempted.current) return;
+
+    const checkSessionAndAccept = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      autoAcceptAttempted.current = true;
+      toast.loading("Processando convite...");
+
+      try {
+        const { error } = await supabase.functions.invoke("accept-invitation", {
+          body: { invite_token: token },
+        });
+
+        if (error) {
+          // Try to extract server message
+          let message = "Erro ao aceitar convite. Contacte o administrador.";
+          if (error.context && typeof error.context.json === "function") {
+            try {
+              const body = await error.context.json();
+              if (body?.error) message = body.error;
+            } catch {}
+          }
+          toast.dismiss();
+          toast.error(message);
+        } else {
+          toast.dismiss();
+          toast.success("Convite aceito com sucesso! Bem-vindo(a)!");
+          navigate("/pacientes");
+        }
+      } catch {
+        toast.dismiss();
+        toast.error("Erro ao processar convite.");
+      }
+    };
+
+    checkSessionAndAccept();
+  }, [token, invitation, navigate]);
+
+  const acceptInvitation = async () => {
+    const { error } = await supabase.functions.invoke("accept-invitation", {
+      body: { invite_token: token },
+    });
+
+    if (error) {
+      let message = "Conta criada, mas houve um erro ao aceitar o convite. Contacte o administrador.";
+      if (error.context && typeof error.context.json === "function") {
+        try {
+          const body = await error.context.json();
+          if (body?.error) message = body.error;
+        } catch {}
+      }
+      toast.error(message);
+    } else {
+      toast.success("Convite aceito com sucesso! Bem-vindo(a)!");
+      navigate("/pacientes");
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      if (isLoginMode) {
+        // Login mode: sign in and accept invitation
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (signInError) throw signInError;
+
+        if (token) {
+          await acceptInvitation();
+        } else {
+          toast.success("Login realizado com sucesso!");
+          navigate("/pacientes");
+        }
+        return;
+      }
+
+      // Signup mode
+      const redirectUrl = token
+        ? `https://healthgestao.lovable.app/signup?token=${token}`
+        : "https://healthgestao.lovable.app";
+
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
-        options: { emailRedirectTo: window.location.origin },
+        options: { emailRedirectTo: redirectUrl },
       });
 
       if (signUpError) throw signUpError;
 
-      if (token && signUpData.session) {
-        const { error: acceptError } = await supabase.functions.invoke("accept-invitation", {
-          body: { invite_token: token },
-        });
+      // Detect repeated signup (user already exists)
+      if (
+        signUpData.user &&
+        (!signUpData.user.identities || signUpData.user.identities.length === 0)
+      ) {
+        toast.info("Este e-mail já está cadastrado. Faça login para aceitar o convite.");
+        setIsLoginMode(true);
+        return;
+      }
 
-        if (acceptError) {
-          console.error("Accept invitation error:", acceptError);
-          toast.error("Conta criada, mas houve um erro ao aceitar o convite. Contacte o administrador.");
-        } else {
-          toast.success("Conta criada e vinculada com sucesso!");
-          navigate("/pacientes");
-          return;
-        }
+      if (token && signUpData.session) {
+        // Email confirmation disabled: session available immediately
+        await acceptInvitation();
+        return;
       } else if (token && !signUpData.session) {
-        toast.success("Conta criada! Verifique seu e-mail para confirmar e depois o convite será processado.");
+        toast.success(
+          "Conta criada! Verifique seu e-mail para confirmar. Ao confirmar, o convite será processado automaticamente."
+        );
       } else {
         toast.success("Conta criada! Verifique seu e-mail para confirmar.");
       }
     } catch (error: any) {
-      toast.error(error.message || "Erro ao criar conta");
+      toast.error(error.message || "Erro ao processar");
     } finally {
       setLoading(false);
     }
@@ -128,13 +218,21 @@ export default function Signup() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary">
-            <Mic className="h-7 w-7 text-primary-foreground" />
+            {isLoginMode ? (
+              <LogIn className="h-7 w-7 text-primary-foreground" />
+            ) : (
+              <Mic className="h-7 w-7 text-primary-foreground" />
+            )}
           </div>
           <CardTitle className="text-2xl font-bold">FonoGestão</CardTitle>
           <CardDescription>
             {invitation
-              ? `Você foi convidado(a) como profissional${invitation.nome_profissional ? ` (${invitation.nome_profissional})` : ""}`
-              : "Crie sua conta"}
+              ? isLoginMode
+                ? `Faça login para aceitar o convite${invitation.nome_profissional ? ` como ${invitation.nome_profissional}` : ""}`
+                : `Você foi convidado(a) como profissional${invitation.nome_profissional ? ` (${invitation.nome_profissional})` : ""}`
+              : isLoginMode
+                ? "Faça login na sua conta"
+                : "Crie sua conta"}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -161,21 +259,38 @@ export default function Signup() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={6}
-                placeholder="Mínimo 6 caracteres"
+                placeholder={isLoginMode ? "Sua senha" : "Mínimo 6 caracteres"}
               />
             </div>
 
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Criando conta..." : "Criar conta"}
+              {loading
+                ? isLoginMode
+                  ? "Entrando..."
+                  : "Criando conta..."
+                : isLoginMode
+                  ? "Entrar"
+                  : "Criar conta"}
             </Button>
 
-            <div className="text-center text-sm">
+            <div className="text-center text-sm space-y-1">
+              {token && (
+                <button
+                  type="button"
+                  className="text-primary hover:underline block w-full"
+                  onClick={() => setIsLoginMode(!isLoginMode)}
+                >
+                  {isLoginMode
+                    ? "Não tem conta? Criar conta"
+                    : "Já tem conta? Fazer login"}
+                </button>
+              )}
               <button
                 type="button"
                 className="text-muted-foreground hover:underline"
                 onClick={() => navigate("/login")}
               >
-                Já tem conta? Entrar
+                Ir para a página de login
               </button>
             </div>
           </form>
