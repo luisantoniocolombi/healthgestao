@@ -98,8 +98,16 @@ export default function Professionals() {
       queryClient.invalidateQueries({ queryKey: ["professionals"] });
       toast({ title: "Convite criado com sucesso!" });
     },
-    onError: (err: any) => {
-      toast({ title: "Erro ao convidar", description: err.message, variant: "destructive" });
+    onError: async (err: any) => {
+      let message = err.message || "Erro desconhecido";
+      // Extract real error from FunctionsHttpError response
+      if (err.context && typeof err.context.json === "function") {
+        try {
+          const body = await err.context.json();
+          if (body?.error) message = body.error;
+        } catch {}
+      }
+      toast({ title: "Erro ao convidar", description: message, variant: "destructive" });
     },
   });
 
