@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAccountProfiles } from "@/hooks/use-account-profiles";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,9 +13,11 @@ import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 
 export default function PatientForm() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
+  const { profileMap } = useAccountProfiles();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [selectedProfessional, setSelectedProfessional] = useState("");
   const [form, setForm] = useState({
     nome_completo: "",
     telefone: "",
@@ -31,9 +34,10 @@ export default function PatientForm() {
     if (!user) return;
     setLoading(true);
 
+    const targetUserId = isAdmin && selectedProfessional ? selectedProfessional : user.id;
     const { error } = await supabase.from("patients").insert({
       ...form,
-      user_id: user.id,
+      user_id: targetUserId,
       created_by: user.id,
       updated_by: user.id,
     });
@@ -126,6 +130,19 @@ export default function PatientForm() {
                   </SelectContent>
                 </Select>
               </div>
+              {isAdmin && Object.keys(profileMap).length > 0 && (
+                <div className="space-y-2">
+                  <Label>Profissional Responsável</Label>
+                  <Select value={selectedProfessional} onValueChange={setSelectedProfessional}>
+                    <SelectTrigger><SelectValue placeholder="Eu mesmo (admin)" /></SelectTrigger>
+                    <SelectContent>
+                      {Object.values(profileMap).map((p) => (
+                        <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="obs">Observações Gerais</Label>
                 <Textarea

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAccountProfiles } from "@/hooks/use-account-profiles";
 import { Patient, Appointment, Receivable, Condition, ClinicalNote } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +20,8 @@ import { ptBR } from "date-fns/locale";
 
 export default function PatientDetail() {
   const { id } = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
+  const { profileMap } = useAccountProfiles();
   const navigate = useNavigate();
   const [patient, setPatient] = useState<Patient | null>(null);
   const [editing, setEditing] = useState(false);
@@ -51,7 +53,7 @@ export default function PatientDetail() {
     if (!user || !id) return;
 
     const [patientRes, condRes, apptRes, recRes, noteRes] = await Promise.all([
-      supabase.from("patients").select("*").eq("id", id).eq("user_id", user.id).single(),
+      supabase.from("patients").select("*").eq("id", id).single(),
       supabase.from("conditions").select("*").eq("patient_id", id).eq("archived", false).order("data_inicio", { ascending: false }),
       supabase.from("appointments").select("*").eq("patient_id", id).eq("archived", false).order("data_atendimento", { ascending: false }),
       supabase.from("receivables").select("*").eq("patient_id", id).eq("archived", false).order("data_cobranca", { ascending: false }),
@@ -74,10 +76,12 @@ export default function PatientDetail() {
 
   const handleSave = async () => {
     if (!id || !user) return;
-    const { nome_completo, telefone, responsavel_nome, endereco, doenca_principal, status, observacoes_gerais, convenio } = form;
+    const { nome_completo, telefone, responsavel_nome, endereco, doenca_principal, status, observacoes_gerais, convenio, user_id } = form;
+    const updateData: any = { nome_completo, telefone, responsavel_nome, endereco, doenca_principal, status, observacoes_gerais, convenio, updated_by: user.id };
+    if (isAdmin && user_id) updateData.user_id = user_id;
     const { error } = await supabase
       .from("patients")
-      .update({ nome_completo, telefone, responsavel_nome, endereco, doenca_principal, status, observacoes_gerais, convenio, updated_by: user.id })
+      .update(updateData)
       .eq("id", id);
     if (error) { toast.error("Erro ao salvar"); return; }
     toast.success("Paciente atualizado!");
@@ -281,6 +285,19 @@ export default function PatientDetail() {
                   <Label>Observações</Label>
                   <Textarea value={form.observacoes_gerais || ""} onChange={(e) => update("observacoes_gerais", e.target.value)} disabled={!editing} rows={3} />
                 </div>
+                {isAdmin && Object.keys(profileMap).length > 0 && (
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label>Profissional Responsável</Label>
+                    <Select value={form.user_id || ""} onValueChange={(v) => update("user_id", v)} disabled={!editing}>
+                      <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                      <SelectContent>
+                        {Object.values(profileMap).map((p) => (
+                          <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
