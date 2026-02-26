@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Mic, UserPlus, LogIn } from "lucide-react";
+import { Brain, UserPlus, LogIn } from "lucide-react";
 
 interface InvitationData {
   id: string;
@@ -221,10 +221,10 @@ export default function Signup() {
             {isLoginMode ? (
               <LogIn className="h-7 w-7 text-primary-foreground" />
             ) : (
-              <Mic className="h-7 w-7 text-primary-foreground" />
+              <Brain className="h-7 w-7 text-primary-foreground" />
             )}
           </div>
-          <CardTitle className="text-2xl font-bold">FonoGestão</CardTitle>
+          <CardTitle className="text-2xl font-bold">Health Gestão</CardTitle>
           <CardDescription>
             {invitation
               ? isLoginMode
