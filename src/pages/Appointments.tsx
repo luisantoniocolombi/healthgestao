@@ -76,6 +76,7 @@ export default function Appointments() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [view, setView] = useState<"month" | "week" | "day">("month");
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [patientFilter, setPatientFilter] = useState<string>("all");
 
   const fetchData = async () => {
     if (!user) return;
@@ -110,8 +111,12 @@ export default function Appointments() {
     end: endOfWeek(endOfMonth(currentMonth), { locale: ptBR }),
   });
 
+  const filteredAppointments = patientFilter === "all"
+    ? appointments
+    : appointments.filter(a => a.patient_id === patientFilter);
+
   const getApptsForDay = (date: Date) =>
-    appointments.filter(a => isSameDay(new Date(a.data_atendimento + "T00:00:00"), date));
+    filteredAppointments.filter(a => isSameDay(new Date(a.data_atendimento + "T00:00:00"), date));
 
   return (
     <div className="space-y-6">
@@ -125,11 +130,26 @@ export default function Appointments() {
         </Button>
       </div>
 
+      {/* Patient filter */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <Select value={patientFilter} onValueChange={setPatientFilter}>
+          <SelectTrigger className="w-full sm:w-72">
+            <SelectValue placeholder="Filtrar por paciente" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os pacientes</SelectItem>
+            {patients.map(p => (
+              <SelectItem key={p.id} value={p.id}>{p.nome_completo}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       {/* Monthly counters */}
       {(() => {
-        const agendados = appointments.filter(a => a.status === "agendado").length;
-        const realizados = appointments.filter(a => a.status === "realizado").length;
-        const cancelados = appointments.filter(a => a.status === "cancelado").length;
+        const agendados = filteredAppointments.filter(a => a.status === "agendado").length;
+        const realizados = filteredAppointments.filter(a => a.status === "realizado").length;
+        const cancelados = filteredAppointments.filter(a => a.status === "cancelado").length;
         return (
           <div className="grid grid-cols-3 gap-3">
             <Card><CardContent className="p-4 text-center"><p className="text-xs text-muted-foreground">Agendados</p><p className="text-2xl font-bold text-blue-500">{agendados}</p></CardContent></Card>
