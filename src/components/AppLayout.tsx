@@ -3,7 +3,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { LogOut, Mic } from "lucide-react";
+import { LogOut, Brain } from "lucide-react";
 
 export function AppLayout() {
   const { user, signOut } = useAuth();
@@ -17,8 +17,8 @@ export function AppLayout() {
             <div className="flex items-center gap-2">
               <SidebarTrigger />
               <div className="flex items-center gap-2">
-                <Mic className="h-5 w-5 text-primary" />
-                <span className="font-semibold text-foreground hidden sm:inline">FonoGestão</span>
+                <Brain className="h-5 w-5 text-primary" />
+                <span className="font-semibold text-foreground hidden sm:inline">Health Gestão</span>
               </div>
             </div>
             <div className="flex items-center gap-3">

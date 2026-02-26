@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Mic } from "lucide-react";
+import { Brain } from "lucide-react";
 
 export default function Login() {
   const [isLogin, setIsLogin] = useState(true);
@@ -50,9 +50,9 @@ export default function Login() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary">
-            <Mic className="h-7 w-7 text-primary-foreground" />
+            <Brain className="h-7 w-7 text-primary-foreground" />
           </div>
-          <CardTitle className="text-2xl font-bold">FonoGestão</CardTitle>
+          <CardTitle className="text-2xl font-bold">Health Gestão</CardTitle>
           <CardDescription>
             {isForgot
               ? "Informe seu e-mail para recuperar a senha"
