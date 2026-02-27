@@ -53,12 +53,18 @@ export default function PatientDetail() {
     if (!user || !id) return;
 
     const [patientRes, condRes, apptRes, recRes, noteRes] = await Promise.all([
-      supabase.from("patients").select("*").eq("id", id).single(),
+      supabase.from("patients").select("*").eq("id", id).maybeSingle(),
       supabase.from("conditions").select("*").eq("patient_id", id).eq("archived", false).order("data_inicio", { ascending: false }),
       supabase.from("appointments").select("*").eq("patient_id", id).eq("archived", false).order("data_atendimento", { ascending: false }),
       supabase.from("receivables").select("*").eq("patient_id", id).eq("archived", false).order("data_cobranca", { ascending: false }),
       supabase.from("clinical_notes").select("*").eq("patient_id", id).eq("archived", false).order("data_nota", { ascending: false }),
     ]);
+
+    if (patientRes.error) {
+      console.error("Erro ao carregar paciente:", patientRes.error);
+      setLoading(false);
+      return;
+    }
 
     if (patientRes.data) {
       const p = patientRes.data as Patient;
