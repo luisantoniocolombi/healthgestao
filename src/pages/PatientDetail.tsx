@@ -76,8 +76,8 @@ export default function PatientDetail() {
 
   const handleSave = async () => {
     if (!id || !user) return;
-    const { nome_completo, telefone, responsavel_nome, endereco, doenca_principal, status, observacoes_gerais, convenio, user_id } = form;
-    const updateData: any = { nome_completo, telefone, responsavel_nome, endereco, doenca_principal, status, observacoes_gerais, convenio, updated_by: user.id };
+    const { nome_completo, telefone, responsavel_nome, endereco, doenca_principal, status, observacoes_gerais, convenio, user_id, cpf, data_nascimento } = form;
+    const updateData: any = { nome_completo, telefone, responsavel_nome, endereco, doenca_principal, status, observacoes_gerais, convenio, cpf: cpf || null, data_nascimento: data_nascimento || null, updated_by: user.id };
     if (isAdmin && user_id) updateData.user_id = user_id;
     const { error } = await supabase
       .from("patients")
@@ -247,6 +247,27 @@ export default function PatientDetail() {
                 <div className="space-y-2">
                   <Label>Telefone</Label>
                   <Input value={form.telefone || ""} onChange={(e) => update("telefone", e.target.value)} disabled={!editing} />
+                </div>
+                <div className="space-y-2">
+                  <Label>CPF</Label>
+                  <Input
+                    value={form.cpf || ""}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/\D/g, "").slice(0, 11);
+                      const masked = raw
+                        .replace(/(\d{3})(\d)/, "$1.$2")
+                        .replace(/(\d{3})(\d)/, "$1.$2")
+                        .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+                      update("cpf", masked);
+                    }}
+                    disabled={!editing}
+                    placeholder="000.000.000-00"
+                    maxLength={14}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Data de Nascimento</Label>
+                  <Input type="date" value={form.data_nascimento || ""} onChange={(e) => update("data_nascimento", e.target.value)} disabled={!editing} />
                 </div>
                 <div className="space-y-2">
                   <Label>Responsável</Label>
