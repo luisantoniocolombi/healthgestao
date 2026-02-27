@@ -342,27 +342,33 @@ export type Database = {
           ativo: boolean
           conta_principal_id: string
           cor_identificacao: string
+          cpf: string | null
           created_at: string
           id: string
           nome: string
+          registro_profissional: string | null
           updated_at: string
         }
         Insert: {
           ativo?: boolean
           conta_principal_id: string
           cor_identificacao?: string
+          cpf?: string | null
           created_at?: string
           id: string
           nome: string
+          registro_profissional?: string | null
           updated_at?: string
         }
         Update: {
           ativo?: boolean
           conta_principal_id?: string
           cor_identificacao?: string
+          cpf?: string | null
           created_at?: string
           id?: string
           nome?: string
+          registro_profissional?: string | null
           updated_at?: string
         }
         Relationships: []
