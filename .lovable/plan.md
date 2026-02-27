@@ -1,30 +1,32 @@
 
 
-# Plano: Corrigir listagem de pacientes no formulario de atendimento
+# Plano: Adicionar campos CPF e Data de Nascimento no cadastro de pacientes
 
-## Problema
+## 1. Migração de banco de dados
 
-No formulario de novo atendimento (`AppointmentForm`, linha 303), a query de pacientes filtra por `.eq("user_id", user.id)`, fazendo o admin ver apenas seus proprios pacientes. Pacientes vinculados a profissionais nao aparecem.
+Adicionar duas colunas na tabela `patients`:
+- `cpf` (text, nullable, unique) — para uso futuro como identificador do cliente
+- `data_nascimento` (date, nullable)
 
-## Solucao
+```sql
+ALTER TABLE public.patients
+  ADD COLUMN cpf text,
+  ADD COLUMN data_nascimento date;
 
-**Arquivo: `src/pages/Appointments.tsx`** (linhas 301-305)
-
-Remover o filtro `user_id` quando o usuario for admin, deixando o RLS filtrar corretamente (a policy `Same account can read patients` ja garante que o admin ve todos os pacientes da conta):
-
-```typescript
-// Antes:
-supabase.from("patients").select("id, nome_completo")
-  .eq("user_id", user.id).eq("archived", false).order("nome_completo")
-
-// Depois:
-let patQ = supabase.from("patients").select("id, nome_completo")
-  .eq("archived", false).order("nome_completo");
-if (!isAdmin) {
-  patQ = patQ.eq("user_id", user.id);
-}
-patQ.then(({ data }) => setPatients((data || []) as Patient[]));
+CREATE UNIQUE INDEX patients_cpf_unique ON public.patients (cpf) WHERE cpf IS NOT NULL;
 ```
 
-Mesmo padrao ja usado na pagina principal de Atendimentos (linhas 91-98) e na pagina de Pacientes.
+## 2. Alterações no código
+
+**`src/pages/PatientForm.tsx`**:
+- Adicionar `cpf` e `data_nascimento` ao estado do formulário
+- Adicionar campo de input para CPF com máscara (formato XXX.XXX.XXX-XX)
+- Adicionar campo de input para Data de Nascimento (tipo date)
+- Posicionar os campos no grid do formulário, junto aos dados pessoais
+
+**`src/types/index.ts`**:
+- Adicionar `cpf?: string` e `data_nascimento?: string` à interface `Patient`
+
+**`src/pages/PatientDetail.tsx`** (se existir exibição de dados):
+- Exibir CPF e data de nascimento na ficha do paciente
 
