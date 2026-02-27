@@ -1,1 +1,0 @@
-ALTER TABLE public.profiles ADD COLUMN cpf text, ADD COLUMN registro_profissional text;

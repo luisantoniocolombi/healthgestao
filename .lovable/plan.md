@@ -1,32 +1,28 @@
 
 
-# Plano: Corrigir sistema travado no "Carregando..."
+# Plano: Corrigir erros no painel do profissional
 
 ## Diagnóstico
 
-Identifiquei **dois problemas**:
+Identifiquei dois problemas principais:
 
-### 1. Políticas RLS de `profiles` continuam RESTRICTIVE
-A migração anterior criou policies sem a cláusula explícita `AS PERMISSIVE`. A configuração atual mostra todas as 3 policies de `profiles` como "Permissive: No" (RESTRICTIVE). Com RESTRICTIVE, **todas** as policies SELECT devem ser verdadeiras simultaneamente:
-- `id = auth.uid()` (apenas próprio perfil)
-- `conta_principal_id = get_my_conta_principal_id()`
+### Problema 1: ErrorBoundary não reseta ao navegar
+O ErrorBoundary atual mantém o estado `hasError: true` mesmo quando o usuário navega para outra página. Uma vez que qualquer página causa erro, TODAS as páginas subsequentes mostram a mensagem de erro sem possibilidade de recuperação (exceto recarregar). Isso explica o comportamento "qualquer campo/item mostra erro".
 
-Para o admin, ambas passam para o próprio perfil. Mas `get_my_conta_principal_id()` consulta `profiles` internamente, o que pode causar lentidão ou bloqueio intermitente durante o carregamento inicial, travando o `fetchProfileAndRole` no `AuthContext`.
+### Problema 2: `.single()` sem tratamento de erro
+Em `AppointmentForm` (linha 311), a query usa `.single()` que falha quando o profissional não tem acesso ao registro via RLS. Isso causa o erro inicial que trava o ErrorBoundary.
 
-### 2. Páginas não tratam erro corretamente
-Em `Patients.tsx` (linha 45-46), quando a query falha, a função retorna **sem chamar `setLoading(false)`**, deixando a página em "Carregando..." para sempre.
+### Problema 3: Sub-queries sem verificação de erro
+Em `PatientDetail`, os erros das queries de `conditions`, `appointments`, `receivables` e `clinical_notes` não são verificados.
 
 ## Solução
 
-### 1. Nova migração SQL: recriar policies de `profiles` com `AS PERMISSIVE` explícito
-Dropar as 3 policies e recriar com a cláusula `AS PERMISSIVE`:
-- `Users can read own profile` - PERMISSIVE SELECT
-- `Admins can read all profiles in their account` - PERMISSIVE SELECT
-- `Admins can update profiles in their account` - PERMISSIVE UPDATE
+### 1. Corrigir ErrorBoundary para resetar ao navegar (`src/components/AppLayout.tsx`)
+Usar `useLocation()` e passar `key={location.pathname}` no ErrorBoundary, forçando remontagem a cada navegação.
 
-### 2. Corrigir tratamento de erro em `Patients.tsx`
-Adicionar `setLoading(false)` no caminho de erro (após `toast.error`), e mover para um bloco `finally`.
+### 2. Trocar `.single()` por `.maybeSingle()` em AppointmentForm (`src/pages/Appointments.tsx`, linha 311)
+Adicionar verificação de erro no `.then()`.
 
-### 3. Aplicar mesmo fix em `Appointments.tsx` e `Financial.tsx`
-Garantir que todas as páginas chamem `setLoading(false)` mesmo em caso de erro.
+### 3. Adicionar tratamento de erro nas sub-queries do PatientDetail (`src/pages/PatientDetail.tsx`)
+Verificar `.error` em cada resultado de query e exibir toast de erro quando necessário.
 

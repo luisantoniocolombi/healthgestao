@@ -2,10 +2,12 @@ import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -15,7 +17,6 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { UserPlus, Copy, Check, Users } from "lucide-react";
-import { ProfessionalCard } from "@/components/ProfessionalCard";
 import type { Profile } from "@/types";
 
 const COLOR_OPTIONS = [
@@ -65,20 +66,17 @@ export default function Professionals() {
     },
   });
 
-  const updateProfile = useMutation({
-    mutationFn: async ({ id, fields }: { id: string; fields: Partial<Profile> }) => {
+  const updateColor = useMutation({
+    mutationFn: async ({ id, cor_identificacao }: { id: string; cor_identificacao: string }) => {
       const { error } = await supabase
         .from("profiles" as any)
-        .update(fields as any)
+        .update({ cor_identificacao } as any)
         .eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["professionals"] });
-      toast({ title: "Profissional atualizado" });
-    },
-    onError: (err: any) => {
-      toast({ title: "Erro ao atualizar", description: err.message, variant: "destructive" });
+      toast({ title: "Cor atualizada" });
     },
   });
 
@@ -86,10 +84,12 @@ export default function Professionals() {
     mutationFn: async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Não autenticado");
+
       const res = await supabase.functions.invoke("invite-professional", {
         body: { email, nome, cor_identificacao: cor, origin: "https://healthgestao.lovable.app" },
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
+
       if (res.error) throw res.error;
       return res.data as { invite_link: string };
     },
@@ -100,6 +100,7 @@ export default function Professionals() {
     },
     onError: async (err: any) => {
       let message = err.message || "Erro desconhecido";
+      // Extract real error from FunctionsHttpError response
       if (err.context && typeof err.context.json === "function") {
         try {
           const body = await err.context.json();
@@ -219,12 +220,40 @@ export default function Professionals() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {professionals.map((prof) => (
-            <ProfessionalCard
-              key={prof.id}
-              prof={prof}
-              onToggleActive={(id, ativo) => toggleActive.mutate({ id, ativo })}
-              onUpdateProfile={(id, fields) => updateProfile.mutate({ id, fields })}
-            />
+            <Card key={prof.id} className="relative overflow-hidden">
+              <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ backgroundColor: prof.cor_identificacao }} />
+              <CardHeader className="pb-3 pl-6">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">{prof.nome}</CardTitle>
+                  <Badge variant={prof.ativo ? "default" : "secondary"}>
+                    {prof.ativo ? "Ativo" : "Inativo"}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="pl-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-muted-foreground">Status</Label>
+                  <Switch
+                    checked={prof.ativo}
+                    onCheckedChange={(checked) => toggleActive.mutate({ id: prof.id, ativo: checked })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-muted-foreground">Cor</Label>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {COLOR_OPTIONS.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        className={`h-6 w-6 rounded-full border-2 transition-all ${prof.cor_identificacao === c ? "border-foreground scale-110" : "border-transparent"}`}
+                        style={{ backgroundColor: c }}
+                        onClick={() => updateColor.mutate({ id: prof.id, cor_identificacao: c })}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}

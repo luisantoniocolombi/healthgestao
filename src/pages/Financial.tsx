@@ -57,15 +57,11 @@ export default function Financial() {
       patQuery.eq("user_id", user.id);
     }
 
-    try {
-      const [recRes, patRes] = await Promise.all([recQuery, patQuery]);
-      setReceivables((recRes.data || []) as Receivable[]);
-      setPatients((patRes.data || []) as Patient[]);
-    } catch (err) {
-      console.error("Erro ao carregar financeiro:", err);
-    } finally {
-      setLoading(false);
-    }
+    const [recRes, patRes] = await Promise.all([recQuery, patQuery]);
+
+    setReceivables((recRes.data || []) as Receivable[]);
+    setPatients((patRes.data || []) as Patient[]);
+    setLoading(false);
   };
 
   useEffect(() => { fetchData(); }, [user, currentMonth, isAdmin]);

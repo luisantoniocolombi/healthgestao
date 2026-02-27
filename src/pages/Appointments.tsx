@@ -97,15 +97,11 @@ export default function Appointments() {
       patQuery.eq("user_id", user.id);
     }
 
-    try {
-      const [apptRes, patRes] = await Promise.all([apptQuery, patQuery]);
-      setAppointments((apptRes.data || []) as Appointment[]);
-      setPatients((patRes.data || []) as Patient[]);
-    } catch (err) {
-      console.error("Erro ao carregar atendimentos:", err);
-    } finally {
-      setLoading(false);
-    }
+    const [apptRes, patRes] = await Promise.all([apptQuery, patQuery]);
+
+    setAppointments((apptRes.data || []) as Appointment[]);
+    setPatients((patRes.data || []) as Patient[]);
+    setLoading(false);
   };
 
   useEffect(() => { fetchData(); }, [user, currentMonth, isAdmin]);
