@@ -1,31 +1,32 @@
 
 
-# Plano: Corrigir tela branca e carregamento de profissionais
+# Plano: Corrigir sistema travado no "Carregando..."
 
 ## Diagnóstico
 
 Identifiquei **dois problemas**:
 
-### 1. Race condition no AuthContext (causa da tela branca)
-Em `AuthContext.tsx`, `setLoading(false)` (linhas 67 e 77) é chamado **ANTES** de `fetchProfileAndRole` completar. Isso faz `isAdmin = false` temporariamente. A página Profissionais vê `isAdmin = false` e renderiza "Acesso restrito", ou pior, causa um erro que o ErrorBoundary captura. Após refresh, o timing muda e funciona.
+### 1. Políticas RLS de `profiles` continuam RESTRICTIVE
+A migração anterior criou policies sem a cláusula explícita `AS PERMISSIVE`. A configuração atual mostra todas as 3 policies de `profiles` como "Permissive: No" (RESTRICTIVE). Com RESTRICTIVE, **todas** as policies SELECT devem ser verdadeiras simultaneamente:
+- `id = auth.uid()` (apenas próprio perfil)
+- `conta_principal_id = get_my_conta_principal_id()`
 
-### 2. Políticas RLS da tabela profiles são RESTRITIVAS
-As 3 políticas SELECT em `profiles` são todas RESTRICTIVE (Permissive: No). Isso significa que TODAS devem ser verdadeiras simultaneamente:
-- `id = auth.uid()` (policy 1)  
-- `conta_principal_id = get_my_conta_principal_id()` (policy 2)
+Para o admin, ambas passam para o próprio perfil. Mas `get_my_conta_principal_id()` consulta `profiles` internamente, o que pode causar lentidão ou bloqueio intermitente durante o carregamento inicial, travando o `fetchProfileAndRole` no `AuthContext`.
 
-A interseção dessas duas condições = admin só lê o **próprio** perfil. A query de profissionais (`id != admin_id`) retorna `[]` vazio. Confirmado pelo network request que retorna `[]`.
+### 2. Páginas não tratam erro corretamente
+Em `Patients.tsx` (linha 45-46), quando a query falha, a função retorna **sem chamar `setLoading(false)`**, deixando a página em "Carregando..." para sempre.
 
 ## Solução
 
-### 1. Corrigir AuthContext (`src/contexts/AuthContext.tsx`)
-Só chamar `setLoading(false)` **depois** que `fetchProfileAndRole` terminar. Await o resultado antes de liberar o loading.
+### 1. Nova migração SQL: recriar policies de `profiles` com `AS PERMISSIVE` explícito
+Dropar as 3 policies e recriar com a cláusula `AS PERMISSIVE`:
+- `Users can read own profile` - PERMISSIVE SELECT
+- `Admins can read all profiles in their account` - PERMISSIVE SELECT
+- `Admins can update profiles in their account` - PERMISSIVE UPDATE
 
-### 2. Migração SQL: trocar policies de profiles para PERMISSIVE
-Dropar as 3 policies RESTRICTIVE e recriar como PERMISSIVE:
-- `Users can read own profile` - PERMISSIVE SELECT: `id = auth.uid()`
-- `Admins can read all profiles in their account` - PERMISSIVE SELECT: `conta_principal_id = get_my_conta_principal_id()`
-- `Admins can update profiles in their account` - PERMISSIVE UPDATE (manter mesma lógica)
+### 2. Corrigir tratamento de erro em `Patients.tsx`
+Adicionar `setLoading(false)` no caminho de erro (após `toast.error`), e mover para um bloco `finally`.
 
-Com PERMISSIVE, basta UMA policy ser verdadeira para conceder acesso. O admin poderá ler todos os profiles da mesma conta.
+### 3. Aplicar mesmo fix em `Appointments.tsx` e `Financial.tsx`
+Garantir que todas as páginas chamem `setLoading(false)` mesmo em caso de erro.
 
