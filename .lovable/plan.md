@@ -1,35 +1,28 @@
 
 
-# Análise: O plano proposto vai funcionar?
+# Plano: Corrigir erros no painel do profissional
 
-## Resposta direta
+## Diagnóstico
 
-**Sim, o plano vai resolver a tela branca**, mas quero ser transparente sobre o que cada parte faz:
+Identifiquei dois problemas principais:
 
-### O que vai RESOLVER a tela branca (certeza alta)
+### Problema 1: ErrorBoundary não reseta ao navegar
+O ErrorBoundary atual mantém o estado `hasError: true` mesmo quando o usuário navega para outra página. Uma vez que qualquer página causa erro, TODAS as páginas subsequentes mostram a mensagem de erro sem possibilidade de recuperação (exceto recarregar). Isso explica o comportamento "qualquer campo/item mostra erro".
 
-**ErrorBoundary** -- Este é o item mais importante. Independente da causa exata do erro JavaScript, o ErrorBoundary captura qualquer crash de renderização do React e exibe uma mensagem amigável ao invés de tela branca. Hoje, sem ErrorBoundary, qualquer erro não tratado remove toda a UI.
+### Problema 2: `.single()` sem tratamento de erro
+Em `AppointmentForm` (linha 311), a query usa `.single()` que falha quando o profissional não tem acesso ao registro via RLS. Isso causa o erro inicial que trava o ErrorBoundary.
 
-**Tratamento de erro no PatientDetail** -- A chamada `.single()` na linha 56 pode retornar erro (ex: se a query falhar por qualquer motivo). Hoje o código não verifica `patientRes.error`, o que pode causar comportamento inesperado. Tratar o erro evita o crash.
+### Problema 3: Sub-queries sem verificação de erro
+Em `PatientDetail`, os erros das queries de `conditions`, `appointments`, `receivables` e `clinical_notes` não são verificados.
 
-### O que vai MELHORAR a experiência (mas provavelmente não é a causa da tela branca)
+## Solução
 
-**Políticas RLS de appointments e receivables** -- Hoje o profissional só vê atendimentos e recebíveis onde `user_id = auth.uid()`. Se o admin criou registros com outro user_id, eles não aparecem. Isso causa dados vazios, não crash. Adicionar `is_same_account` melhora a visibilidade de dados, mas provavelmente não é o que causa a tela branca.
+### 1. Corrigir ErrorBoundary para resetar ao navegar (`src/components/AppLayout.tsx`)
+Usar `useLocation()` e passar `key={location.pathname}` no ErrorBoundary, forçando remontagem a cada navegação.
 
-## Verificação que fiz
+### 2. Trocar `.single()` por `.maybeSingle()` em AppointmentForm (`src/pages/Appointments.tsx`, linha 311)
+Adicionar verificação de erro no `.then()`.
 
-- As políticas RLS são todas PERMISSIVE (não restritivas) -- profissional CONSEGUE ler pacientes da mesma conta
-- Foreign keys existem entre as tabelas -- os joins funcionam
-- O `useAuth()` carrega role corretamente para profissionais (`role = "profissional"`)
-
-## Recomendação
-
-O plano é sólido e deve ser implementado. O ErrorBoundary sozinho já previne tela branca. Se após a implementação o erro persistir de forma visível (agora com mensagem ao invés de tela branca), teremos informação concreta para diagnosticar a causa exata.
-
-## Passos de implementação
-
-1. Criar `ErrorBoundary` component
-2. Aplicar no `AppLayout` envolvendo o `<Outlet />`
-3. Adicionar tratamento de erro em `PatientDetail.fetchAll`
-4. Migração SQL: adicionar policy `is_same_account(user_id)` SELECT em `appointments` e `receivables`
+### 3. Adicionar tratamento de erro nas sub-queries do PatientDetail (`src/pages/PatientDetail.tsx`)
+Verificar `.error` em cada resultado de query e exibir toast de erro quando necessário.
 
