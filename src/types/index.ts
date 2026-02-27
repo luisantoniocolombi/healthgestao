@@ -105,6 +105,8 @@ export interface Profile {
   cor_identificacao: string;
   conta_principal_id: string;
   ativo: boolean;
+  cpf?: string;
+  registro_profissional?: string;
   created_at: string;
   updated_at: string;
 }
