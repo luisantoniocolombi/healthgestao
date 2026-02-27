@@ -308,8 +308,9 @@ export function AppointmentForm() {
     patQ.then(({ data }) => setPatients((data || []) as Patient[]));
 
     if (id) {
-      supabase.from("appointments").select("*").eq("id", id).single()
-        .then(({ data }) => {
+      supabase.from("appointments").select("*").eq("id", id).maybeSingle()
+        .then(({ data, error }) => {
+          if (error) { console.error("Erro ao carregar atendimento:", error); return; }
           if (data) {
             setExisting(data as Appointment);
             setForm({

@@ -1,4 +1,4 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -8,6 +8,7 @@ import { LogOut, Brain } from "lucide-react";
 
 export function AppLayout() {
   const { user, signOut } = useAuth();
+  const location = useLocation();
 
   return (
     <SidebarProvider>
@@ -32,7 +33,7 @@ export function AppLayout() {
             </div>
           </header>
           <main className="flex-1 overflow-auto p-4 md:p-6">
-            <ErrorBoundary>
+            <ErrorBoundary key={location.pathname}>
               <Outlet />
             </ErrorBoundary>
           </main>

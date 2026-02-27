@@ -71,6 +71,10 @@ export default function PatientDetail() {
       setPatient(p);
       setForm(p);
     }
+    if (condRes.error) console.error("Erro condições:", condRes.error);
+    if (apptRes.error) console.error("Erro atendimentos:", apptRes.error);
+    if (recRes.error) console.error("Erro recebíveis:", recRes.error);
+    if (noteRes.error) console.error("Erro notas:", noteRes.error);
     setConditions((condRes.data || []) as Condition[]);
     setAppointments((apptRes.data || []) as Appointment[]);
     setReceivables((recRes.data || []) as Receivable[]);
