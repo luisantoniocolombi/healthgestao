@@ -9,6 +9,8 @@ export interface Patient {
   doenca_principal?: string;
   observacoes_gerais?: string;
   convenio?: string;
+  cpf?: string;
+  data_nascimento?: string;
   status: 'ativo' | 'inativo';
   archived: boolean;
   created_at: string;

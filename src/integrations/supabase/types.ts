@@ -278,8 +278,10 @@ export type Database = {
         Row: {
           archived: boolean
           convenio: string | null
+          cpf: string | null
           created_at: string
           created_by: string | null
+          data_nascimento: string | null
           doenca_principal: string | null
           endereco: string | null
           id: string
@@ -296,8 +298,10 @@ export type Database = {
         Insert: {
           archived?: boolean
           convenio?: string | null
+          cpf?: string | null
           created_at?: string
           created_by?: string | null
+          data_nascimento?: string | null
           doenca_principal?: string | null
           endereco?: string | null
           id?: string
@@ -314,8 +318,10 @@ export type Database = {
         Update: {
           archived?: boolean
           convenio?: string | null
+          cpf?: string | null
           created_at?: string
           created_by?: string | null
+          data_nascimento?: string | null
           doenca_principal?: string | null
           endereco?: string | null
           id?: string

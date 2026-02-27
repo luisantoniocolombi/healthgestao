@@ -26,6 +26,8 @@ export default function PatientForm() {
     doenca_principal: "",
     observacoes_gerais: "",
     convenio: "",
+    cpf: "",
+    data_nascimento: "",
     status: "ativo",
   });
 
@@ -35,12 +37,15 @@ export default function PatientForm() {
     setLoading(true);
 
     const targetUserId = isAdmin && selectedProfessional ? selectedProfessional : user.id;
-    const { error } = await supabase.from("patients").insert({
+    const insertData: any = {
       ...form,
+      cpf: form.cpf || null,
+      data_nascimento: form.data_nascimento || null,
       user_id: targetUserId,
       created_by: user.id,
       updated_by: user.id,
-    });
+    };
+    const { error } = await supabase.from("patients").insert(insertData);
 
     if (error) {
       toast.error("Erro ao salvar paciente");
@@ -83,6 +88,32 @@ export default function PatientForm() {
                   value={form.telefone}
                   onChange={(e) => update("telefone", e.target.value)}
                   required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cpf">CPF</Label>
+                <Input
+                  id="cpf"
+                  value={form.cpf}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\D/g, "").slice(0, 11);
+                    const masked = raw
+                      .replace(/(\d{3})(\d)/, "$1.$2")
+                      .replace(/(\d{3})(\d)/, "$1.$2")
+                      .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+                    update("cpf", masked);
+                  }}
+                  placeholder="000.000.000-00"
+                  maxLength={14}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="nascimento">Data de Nascimento</Label>
+                <Input
+                  id="nascimento"
+                  type="date"
+                  value={form.data_nascimento}
+                  onChange={(e) => update("data_nascimento", e.target.value)}
                 />
               </div>
               <div className="space-y-2">
