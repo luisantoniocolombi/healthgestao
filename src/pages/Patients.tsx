@@ -40,18 +40,21 @@ export default function Patients() {
       query = query.eq("status", statusFilter);
     }
 
-    const { data, error } = await query;
-    if (error) {
-      toast.error("Erro ao carregar pacientes");
-      return;
+    try {
+      const { data, error } = await query;
+      if (error) {
+        toast.error("Erro ao carregar pacientes");
+        return;
+      }
+      const enriched = ((data || []) as Patient[]).map(p => ({
+        ...p,
+        _prof_color: profileMap[p.user_id]?.cor_identificacao,
+        _prof_nome: profileMap[p.user_id]?.nome,
+      }));
+      setPatients(enriched);
+    } finally {
+      setLoading(false);
     }
-    const enriched = ((data || []) as Patient[]).map(p => ({
-      ...p,
-      _prof_color: profileMap[p.user_id]?.cor_identificacao,
-      _prof_nome: profileMap[p.user_id]?.nome,
-    }));
-    setPatients(enriched);
-    setLoading(false);
   };
 
   useEffect(() => {
