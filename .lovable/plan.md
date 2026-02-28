@@ -1,48 +1,28 @@
 
 
-# Fluxo de Caixa - Proposta de Implementação
+# Nova Receita no Fluxo de Caixa
 
-## Conceito
-
-Uma nova página "Fluxo de Caixa" visível apenas para o admin, com controle mensal de entradas (recebíveis pagos) e saídas (despesas da clínica), mostrando saldo do período.
+Adicionar botao "Nova Receita" ao lado de "Nova Despesa" para lancar entradas manuais de outras origens (nao vinculadas a pacientes).
 
 ## Banco de dados
 
-### Nova tabela: `expenses` (contas a pagar)
-- `id`, `user_id`, `conta_principal_id`
-- `descricao` (text) - ex: "Aluguel", "Material"
-- `categoria` (text) - ex: "Fixo", "Variável", "Pessoal"
-- `valor` (numeric)
-- `data_vencimento` (date)
-- `data_pagamento` (date, nullable)
-- `status` (text: "pendente" | "pago" | "cancelado")
-- `forma_pagamento` (text, nullable)
-- `observacao` (text, nullable)
-- `archived`, `created_at`, `updated_at`
-- RLS: apenas admin da conta pode ler/escrever
+Adicionar coluna `tipo` na tabela `expenses` com default `'despesa'`. Isso permite reusar a mesma tabela para receitas e despesas manuais, sem criar tabela nova.
 
-### Sem alteração na tabela `receivables`
-As entradas no fluxo de caixa são calculadas automaticamente a partir dos recebíveis com `status_pagamento = 'pago'` no mês selecionado.
+```sql
+ALTER TABLE public.expenses ADD COLUMN tipo text NOT NULL DEFAULT 'despesa';
+```
 
-## Frontend
+## Frontend (`src/pages/CashFlow.tsx`)
 
-### Nova página: `/fluxo-de-caixa` (apenas admin)
-- Seletor de mês
-- 3 cards resumo: **Total Entradas** (recebíveis pagos), **Total Saídas** (despesas pagas), **Saldo**
-- Tabela unificada em ordem cronológica com colunas: Data, Descrição, Tipo (Entrada/Saída), Valor, Status
-  - Entradas: puxadas de `receivables` onde `status_pagamento = 'pago'` e `data_pagamento` no mês
-  - Saídas: puxadas de `expenses`
-- Botão "Nova Despesa" abre dialog para cadastrar conta a pagar
-- Ações nas despesas: marcar como pago, cancelar, editar
-- Filtros por tipo (entrada/saída) e categoria
+1. Adicionar estado `dialogMode` ("despesa" | "receita") para controlar qual tipo o dialog esta criando
+2. Botao "Nova Receita" (variante outline com icone verde) ao lado de "Nova Despesa"
+3. No `handleSave`, incluir o campo `tipo` no insert (despesa ou receita)
+4. No `fetchData`, buscar expenses com `tipo = 'receita'` tambem e incluir como entradas no fluxo
+5. No calculo de `totalEntradas`, somar receitas manuais (expenses com tipo=receita e status=pago) aos receivables pagos
+6. Na tabela, receitas manuais aparecem como "entrada" com acoes de editar/pagar/cancelar (igual despesas)
+7. Dialog title muda conforme o modo: "Nova Receita" ou "Nova Despesa"
 
-### Sidebar
-- Novo item "Fluxo de Caixa" visível apenas quando `isAdmin = true`
-
-## Arquivos afetados
-- Migração SQL: criar tabela `expenses` + RLS
-- `src/pages/CashFlow.tsx` (novo)
-- `src/App.tsx` - nova rota
-- `src/components/AppSidebar.tsx` - novo link admin-only
-- `src/types/index.ts` - tipo Expense
+### Arquivo afetado
+- Migracao SQL: adicionar coluna `tipo`
+- `src/pages/CashFlow.tsx`: botao, logica de modo, calculo de totais
 
