@@ -54,6 +54,7 @@ export default function CashFlow() {
   const [typeFilter, setTypeFilter] = useState("todos");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [dialogMode, setDialogMode] = useState<"despesa" | "receita">("despesa");
 
   // Form state
   const [form, setForm] = useState({
@@ -114,11 +115,12 @@ export default function CashFlow() {
     });
 
     expenses.forEach((e) => {
+      const isReceita = (e as any).tipo === "receita";
       items.push({
         id: e.id,
         data: e.data_pagamento || e.data_vencimento,
         descricao: e.descricao,
-        tipo: "saida",
+        tipo: isReceita ? "entrada" : "saida",
         valor: e.valor,
         status: e.status,
         original: e,
@@ -130,8 +132,9 @@ export default function CashFlow() {
     return items.sort((a, b) => a.data.localeCompare(b.data));
   }, [receivables, expenses, typeFilter]);
 
-  const totalEntradas = receivables.reduce((s, r) => s + Number(r.valor), 0);
-  const totalSaidas = expenses.filter((e) => e.status === "pago").reduce((s, e) => s + Number(e.valor), 0);
+  const receitasManuais = expenses.filter((e) => (e as any).tipo === "receita" && e.status === "pago").reduce((s, e) => s + Number(e.valor), 0);
+  const totalEntradas = receivables.reduce((s, r) => s + Number(r.valor), 0) + receitasManuais;
+  const totalSaidas = expenses.filter((e) => (e as any).tipo !== "receita" && e.status === "pago").reduce((s, e) => s + Number(e.valor), 0);
   const saldo = totalEntradas - totalSaidas;
 
   const resetForm = () => {
@@ -139,13 +142,15 @@ export default function CashFlow() {
     setEditingExpense(null);
   };
 
-  const handleOpenNew = () => {
+  const handleOpenNew = (mode: "despesa" | "receita") => {
     resetForm();
+    setDialogMode(mode);
     setDialogOpen(true);
   };
 
   const handleEdit = (expense: Expense) => {
     setEditingExpense(expense);
+    setDialogMode((expense as any).tipo === "receita" ? "receita" : "despesa");
     setForm({
       descricao: expense.descricao,
       categoria: expense.categoria,
@@ -187,6 +192,7 @@ export default function CashFlow() {
         data_vencimento: form.data_vencimento,
         forma_pagamento: form.forma_pagamento || null,
         observacao: form.observacao || null,
+        tipo: dialogMode,
       } as any);
       if (error) { toast.error("Erro ao criar despesa"); return; }
       toast.success("Despesa criada");
@@ -255,7 +261,8 @@ export default function CashFlow() {
               ))}
             </SelectContent>
           </Select>
-          <Button onClick={handleOpenNew}><Plus className="h-4 w-4 mr-1" /> Nova Despesa</Button>
+          <Button variant="outline" className="text-emerald-600 border-emerald-600 hover:bg-emerald-50" onClick={() => handleOpenNew("receita")}><Plus className="h-4 w-4 mr-1" /> Nova Receita</Button>
+          <Button onClick={() => handleOpenNew("despesa")}><Plus className="h-4 w-4 mr-1" /> Nova Despesa</Button>
         </div>
       </div>
 
@@ -344,7 +351,7 @@ export default function CashFlow() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      {entry.tipo === "saida" && (entry.original as Expense).status === "pendente" && (
+                      {(entry.original as any).tipo && (entry.original as Expense).status === "pendente" && (
                         <div className="flex justify-end gap-1">
                           <Button size="icon" variant="ghost" title="Marcar como pago" onClick={() => handleMarkPaid(entry.original as Expense)}>
                             <Check className="h-4 w-4 text-emerald-500" />
@@ -357,7 +364,7 @@ export default function CashFlow() {
                           </Button>
                         </div>
                       )}
-                      {entry.tipo === "saida" && (entry.original as Expense).status !== "pendente" && (
+                      {(entry.original as any).tipo && (entry.original as Expense).status !== "pendente" && (
                         <Button size="icon" variant="ghost" title="Excluir" onClick={() => handleArchive(entry.original as Expense)}>
                           <Trash2 className="h-4 w-4 text-muted-foreground" />
                         </Button>
@@ -385,7 +392,7 @@ export default function CashFlow() {
       <Dialog open={dialogOpen} onOpenChange={(o) => { if (!o) resetForm(); setDialogOpen(o); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingExpense ? "Editar Despesa" : "Nova Despesa"}</DialogTitle>
+            <DialogTitle>{editingExpense ? (dialogMode === "receita" ? "Editar Receita" : "Editar Despesa") : (dialogMode === "receita" ? "Nova Receita" : "Nova Despesa")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -424,7 +431,7 @@ export default function CashFlow() {
           </div>
           <DialogFooter>
             <DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose>
-            <Button onClick={handleSave}>{editingExpense ? "Salvar" : "Criar Despesa"}</Button>
+            <Button onClick={handleSave}>{editingExpense ? "Salvar" : (dialogMode === "receita" ? "Criar Receita" : "Criar Despesa")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
