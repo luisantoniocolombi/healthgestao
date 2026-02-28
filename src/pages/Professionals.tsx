@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, forwardRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -160,7 +161,7 @@ function ProfessionalCard({ prof, onUpdate }: { prof: Profile; onUpdate: () => v
   );
 }
 
-export default function Professionals() {
+const Professionals = forwardRef<HTMLDivElement, object>(function Professionals(_props, ref) {
   const { user, isAdmin } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -251,7 +252,7 @@ export default function Professionals() {
   }
 
   return (
-    <div className="space-y-6">
+    <div ref={ref} className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Profissionais</h1>
@@ -268,6 +269,7 @@ export default function Professionals() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Convidar Profissional</DialogTitle>
+              <DialogDescription>Preencha os dados abaixo para gerar um link de convite.</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 pt-2">
               <div className="space-y-2">
@@ -333,4 +335,6 @@ export default function Professionals() {
       )}
     </div>
   );
-}
+});
+
+export default Professionals;
