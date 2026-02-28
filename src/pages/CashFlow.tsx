@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Table, TableHeader, TableBody, TableFooter, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowDownCircle, ArrowUpCircle, DollarSign, Plus, Check, X, Edit, Trash2 } from "lucide-react";
@@ -393,6 +393,7 @@ const CashFlow = forwardRef<HTMLDivElement, object>(function CashFlow(_props, re
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{editingExpense ? (dialogMode === "receita" ? "Editar Receita" : "Editar Despesa") : (dialogMode === "receita" ? "Nova Receita" : "Nova Despesa")}</DialogTitle>
+            <DialogDescription>Preencha os dados abaixo.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
