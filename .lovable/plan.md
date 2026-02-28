@@ -1,33 +1,36 @@
 
 
-# Plano: Atualizar status do atendimento no hover
+# Correcao: Paciente nao aparece ao editar atendimento agendado
 
-## Problema de RLS
+## Problema
 
-Atualmente, apenas o dono do atendimento (`user_id = auth.uid()`) pode fazer UPDATE. Admins só têm SELECT. Preciso adicionar uma policy de UPDATE para admins.
-
-## Alterações
-
-### 1. Migration: Adicionar policy de UPDATE para admins em `appointments`
-
-```sql
-CREATE POLICY "Admins update appointments in same account"
-ON public.appointments
-FOR UPDATE
-TO authenticated
-USING (has_role(auth.uid(), 'admin'::app_role) AND is_same_account(user_id))
-WITH CHECK (has_role(auth.uid(), 'admin'::app_role) AND is_same_account(user_id));
+Em `AppointmentForm` (linha 353-354), a query de pacientes filtra por `user_id` para nao-admins:
+```tsx
+if (!isAdmin) {
+  patQ = patQ.eq("user_id", user.id);
+}
 ```
 
-### 2. UI em `src/pages/Appointments.tsx`
+Isso exclui pacientes criados por outros usuarios da mesma conta. O RLS ja garante que so pacientes da mesma conta sao retornados (policy `is_same_account`), entao esse filtro e redundante e causa o bug.
 
-Na lista diária de atendimentos (linhas ~246-268), quando o status for `"agendado"`:
+## Correcao
 
-- Ao passar o mouse sobre o Badge de status, mostrar um botão/ícone de check para marcar como `"realizado"`
-- Ao clicar, chamar `supabase.from("appointments").update({ status: "realizado" }).eq("id", a.id)` e atualizar o estado local
-- Usar um `DropdownMenu` ou simplesmente um clique direto no Badge com tooltip para trocar o status
-- Impedir propagação do click para não navegar ao detalhe do atendimento
-- Após sucesso, atualizar a lista localmente (sem reload)
+### Arquivo: `src/pages/Appointments.tsx`
 
-A interação será: hover no Badge "agendado" → Badge muda visual (ex: ícone de check aparece) → clique → status atualizado para "realizado" com toast de confirmação.
+Remover as linhas 353-355 (o filtro `user_id` na query de pacientes do formulario):
+
+```tsx
+// ANTES
+let patQ = supabase.from("patients").select("id, nome_completo")
+  .eq("archived", false).order("nome_completo");
+if (!isAdmin) {
+  patQ = patQ.eq("user_id", user.id);
+}
+
+// DEPOIS
+const patQ = supabase.from("patients").select("id, nome_completo")
+  .eq("archived", false).order("nome_completo");
+```
+
+O RLS (`is_same_account`) ja cuida da seguranca. Sem mais alteracoes.
 
