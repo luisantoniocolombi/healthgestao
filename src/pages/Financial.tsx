@@ -11,7 +11,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Table, TableHeader, TableBody, TableFooter, TableHead, TableRow, TableCell } from "@/components/ui/table";
+import { CardHeader, CardTitle } from "@/components/ui/card";
 import { DollarSign, Plus, Search, Check, X, Edit } from "lucide-react";
+import { Appointment } from "@/types";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -21,6 +24,7 @@ export default function Financial() {
   const { profileMap, isAdmin } = useAccountProfiles();
   const navigate = useNavigate();
   const [receivables, setReceivables] = useState<Receivable[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("todos");
@@ -52,14 +56,21 @@ export default function Financial() {
     const patQuery = supabase.from("patients").select("id, nome_completo")
         .eq("archived", false).order("nome_completo");
 
+    const aptQuery = supabase.from("appointments").select("id, patient_id, data_atendimento, patients(nome_completo)")
+        .eq("archived", false)
+        .in("status", ["realizado", "agendado"])
+        .gte("data_atendimento", start).lte("data_atendimento", end);
+
     if (!isAdmin) {
       recQuery.eq("user_id", user.id);
       patQuery.eq("user_id", user.id);
+      aptQuery.eq("user_id", user.id);
     }
 
-    const [recRes, patRes] = await Promise.all([recQuery, patQuery]);
+    const [recRes, patRes, aptRes] = await Promise.all([recQuery, patQuery, aptQuery]);
 
     setReceivables((recRes.data || []) as Receivable[]);
+    setAppointments((aptRes.data || []) as Appointment[]);
     setPatients((patRes.data || []) as Patient[]);
     setLoading(false);
   };
@@ -223,6 +234,70 @@ export default function Financial() {
           </SelectContent>
         </Select>
       </div>
+
+      {/* Resumo por Paciente */}
+      {!loading && (() => {
+        // Build summary per patient from receivables (pendente) + appointments
+        const patientMap = new Map<string, { nome: string; totalReceber: number; atendimentos: number; dias: string[] }>();
+
+        // Aggregate receivables pendentes
+        filtered.filter(r => r.status_pagamento === "pendente").forEach(r => {
+          const entry = patientMap.get(r.patient_id) || { nome: (r as any).patients?.nome_completo || "—", totalReceber: 0, atendimentos: 0, dias: [] };
+          entry.totalReceber += Number(r.valor);
+          patientMap.set(r.patient_id, entry);
+        });
+
+        // Aggregate appointments
+        appointments.forEach(a => {
+          const entry = patientMap.get(a.patient_id) || { nome: a.patients?.nome_completo || "—", totalReceber: 0, atendimentos: 0, dias: [] };
+          entry.atendimentos += 1;
+          const dia = format(new Date(a.data_atendimento + "T12:00:00"), "dd/MM");
+          if (!entry.dias.includes(dia)) entry.dias.push(dia);
+          patientMap.set(a.patient_id, entry);
+        });
+
+        const summaryRows = Array.from(patientMap.values())
+          .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+        const grandTotal = summaryRows.reduce((s, r) => s + r.totalReceber, 0);
+
+        if (summaryRows.length === 0) return null;
+
+        return (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Resumo por Paciente</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Paciente</TableHead>
+                    <TableHead className="text-center">Atendimentos</TableHead>
+                    <TableHead>Dias</TableHead>
+                    <TableHead className="text-right">Total a Receber</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {summaryRows.map((row, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="font-medium">{row.nome}</TableCell>
+                      <TableCell className="text-center">{row.atendimentos}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{row.dias.sort().join(", ")}</TableCell>
+                      <TableCell className="text-right font-semibold">R$ {row.totalReceber.toFixed(2)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+                <TableFooter>
+                  <TableRow>
+                    <TableCell colSpan={3} className="font-semibold">Total Geral</TableCell>
+                    <TableCell className="text-right font-bold">R$ {grandTotal.toFixed(2)}</TableCell>
+                  </TableRow>
+                </TableFooter>
+              </Table>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Table */}
       {loading ? (
