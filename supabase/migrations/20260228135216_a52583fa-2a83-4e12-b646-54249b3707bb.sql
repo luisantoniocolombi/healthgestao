@@ -1,0 +1,1 @@
+ALTER TABLE public.expenses ADD COLUMN tipo text NOT NULL DEFAULT 'despesa';
