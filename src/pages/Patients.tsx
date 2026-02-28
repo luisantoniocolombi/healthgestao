@@ -23,35 +23,40 @@ export default function Patients() {
 
   const fetchPatients = async () => {
     if (!user) return;
-    const isArchived = statusFilter === "arquivados";
+    try {
+      const isArchived = statusFilter === "arquivados";
 
-    let query = supabase
-      .from("patients")
-      .select("*")
-      .eq("archived", isArchived)
-      .order("nome_completo");
+      let query = supabase
+        .from("patients")
+        .select("*")
+        .eq("archived", isArchived)
+        .order("nome_completo");
 
-    // Professional sees only own patients; admin sees all via RLS
-    if (!isAdmin) {
-      query = query.eq("user_id", user.id);
+      if (!isAdmin) {
+        query = query.eq("user_id", user.id);
+      }
+
+      if (!isArchived && statusFilter !== "todos") {
+        query = query.eq("status", statusFilter);
+      }
+
+      const { data, error } = await query;
+      if (error) {
+        toast.error("Erro ao carregar pacientes");
+        return;
+      }
+      const enriched = ((data || []) as Patient[]).map(p => ({
+        ...p,
+        _prof_color: profileMap[p.user_id]?.cor_identificacao,
+        _prof_nome: profileMap[p.user_id]?.nome,
+      }));
+      setPatients(enriched);
+    } catch (err) {
+      console.error("Erro ao carregar pacientes:", err);
+      toast.error("Erro inesperado ao carregar pacientes");
+    } finally {
+      setLoading(false);
     }
-
-    if (!isArchived && statusFilter !== "todos") {
-      query = query.eq("status", statusFilter);
-    }
-
-    const { data, error } = await query;
-    if (error) {
-      toast.error("Erro ao carregar pacientes");
-      return;
-    }
-    const enriched = ((data || []) as Patient[]).map(p => ({
-      ...p,
-      _prof_color: profileMap[p.user_id]?.cor_identificacao,
-      _prof_nome: profileMap[p.user_id]?.nome,
-    }));
-    setPatients(enriched);
-    setLoading(false);
   };
 
   useEffect(() => {

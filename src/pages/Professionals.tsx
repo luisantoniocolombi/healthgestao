@@ -16,13 +16,149 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus, Copy, Check, Users } from "lucide-react";
+import { UserPlus, Copy, Check, Users, Save } from "lucide-react";
 import type { Profile } from "@/types";
 
 const COLOR_OPTIONS = [
   "#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#8b5cf6",
   "#ec4899", "#06b6d4", "#f97316", "#6366f1", "#14b8a6",
 ];
+
+function cpfMask(value: string) {
+  const raw = value.replace(/\D/g, "").slice(0, 11);
+  return raw
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+}
+
+function ProfessionalCard({ prof, onUpdate }: { prof: Profile; onUpdate: () => void }) {
+  const { toast } = useToast();
+  const [editingField, setEditingField] = useState<string | null>(null);
+  const [fieldValues, setFieldValues] = useState({
+    nome: prof.nome,
+    email: prof.email || "",
+    cpf: prof.cpf || "",
+    registro_profissional: prof.registro_profissional || "",
+  });
+
+  const updateProfile = useMutation({
+    mutationFn: async (updates: Partial<Profile>) => {
+      const { error } = await supabase
+        .from("profiles" as any)
+        .update(updates as any)
+        .eq("id", prof.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      onUpdate();
+      toast({ title: "Perfil atualizado" });
+      setEditingField(null);
+    },
+    onError: () => {
+      toast({ title: "Erro ao atualizar", variant: "destructive" });
+    },
+  });
+
+  const toggleActive = useMutation({
+    mutationFn: async (ativo: boolean) => {
+      const { error } = await supabase
+        .from("profiles" as any)
+        .update({ ativo } as any)
+        .eq("id", prof.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      onUpdate();
+      toast({ title: "Status atualizado" });
+    },
+  });
+
+  const saveField = (field: string) => {
+    const value = (fieldValues as any)[field];
+    updateProfile.mutate({ [field]: value || null });
+  };
+
+  const renderEditableField = (label: string, field: string, placeholder: string, mask?: (v: string) => string) => {
+    const isEditing = editingField === field;
+    const value = (fieldValues as any)[field];
+    return (
+      <div className="space-y-1">
+        <Label className="text-xs text-muted-foreground">{label}</Label>
+        <div className="flex items-center gap-1.5">
+          {isEditing ? (
+            <>
+              <Input
+                value={value}
+                onChange={(e) => {
+                  const v = mask ? mask(e.target.value) : e.target.value;
+                  setFieldValues(prev => ({ ...prev, [field]: v }));
+                }}
+                placeholder={placeholder}
+                className="h-8 text-sm"
+                autoFocus
+                onKeyDown={(e) => { if (e.key === "Enter") saveField(field); if (e.key === "Escape") setEditingField(null); }}
+              />
+              <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={() => saveField(field)} disabled={updateProfile.isPending}>
+                <Save className="h-3.5 w-3.5" />
+              </Button>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="text-sm text-left w-full px-2 py-1 rounded hover:bg-muted/50 transition-colors truncate"
+              onClick={() => setEditingField(field)}
+            >
+              {value || <span className="text-muted-foreground italic">{placeholder}</span>}
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <Card className="relative overflow-hidden">
+      <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ backgroundColor: prof.cor_identificacao }} />
+      <CardHeader className="pb-2 pl-6">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg">{prof.nome}</CardTitle>
+          <Badge variant={prof.ativo ? "default" : "secondary"}>
+            {prof.ativo ? "Ativo" : "Inativo"}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="pl-6 space-y-3">
+        {renderEditableField("Nome", "nome", "Nome do profissional")}
+        {renderEditableField("Email", "email", "email@exemplo.com")}
+        {renderEditableField("CPF", "cpf", "000.000.000-00", cpfMask)}
+        {renderEditableField("Registro Profissional", "registro_profissional", "Ex: CRF-A 12345")}
+
+        <div className="flex items-center justify-between pt-2">
+          <Label className="text-xs text-muted-foreground">Status</Label>
+          <Switch
+            checked={prof.ativo}
+            onCheckedChange={(checked) => toggleActive.mutate(checked)}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Cor</Label>
+          <div className="flex gap-1.5 flex-wrap">
+            {COLOR_OPTIONS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                className={`h-6 w-6 rounded-full border-2 transition-all ${prof.cor_identificacao === c ? "border-foreground scale-110" : "border-transparent"}`}
+                style={{ backgroundColor: c }}
+                onClick={() => updateProfile.mutate({ cor_identificacao: c })}
+              />
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function Professionals() {
   const { user, isAdmin } = useAuth();
@@ -52,44 +188,14 @@ export default function Professionals() {
     enabled: !!user && isAdmin,
   });
 
-  const toggleActive = useMutation({
-    mutationFn: async ({ id, ativo }: { id: string; ativo: boolean }) => {
-      const { error } = await supabase
-        .from("profiles" as any)
-        .update({ ativo } as any)
-        .eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["professionals"] });
-      toast({ title: "Status atualizado" });
-    },
-  });
-
-  const updateColor = useMutation({
-    mutationFn: async ({ id, cor_identificacao }: { id: string; cor_identificacao: string }) => {
-      const { error } = await supabase
-        .from("profiles" as any)
-        .update({ cor_identificacao } as any)
-        .eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["professionals"] });
-      toast({ title: "Cor atualizada" });
-    },
-  });
-
   const inviteMutation = useMutation({
     mutationFn: async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Não autenticado");
-
       const res = await supabase.functions.invoke("invite-professional", {
         body: { email, nome, cor_identificacao: cor, origin: "https://healthgestao.lovable.app" },
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
-
       if (res.error) throw res.error;
       return res.data as { invite_link: string };
     },
@@ -100,7 +206,6 @@ export default function Professionals() {
     },
     onError: async (err: any) => {
       let message = err.message || "Erro desconhecido";
-      // Extract real error from FunctionsHttpError response
       if (err.context && typeof err.context.json === "function") {
         try {
           const body = await err.context.json();
@@ -134,6 +239,8 @@ export default function Professionals() {
     setInviteLink("");
     setCopied(false);
   };
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["professionals"] });
 
   if (!isAdmin) {
     return (
@@ -220,40 +327,7 @@ export default function Professionals() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {professionals.map((prof) => (
-            <Card key={prof.id} className="relative overflow-hidden">
-              <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ backgroundColor: prof.cor_identificacao }} />
-              <CardHeader className="pb-3 pl-6">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">{prof.nome}</CardTitle>
-                  <Badge variant={prof.ativo ? "default" : "secondary"}>
-                    {prof.ativo ? "Ativo" : "Inativo"}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="pl-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label className="text-muted-foreground">Status</Label>
-                  <Switch
-                    checked={prof.ativo}
-                    onCheckedChange={(checked) => toggleActive.mutate({ id: prof.id, ativo: checked })}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-muted-foreground">Cor</Label>
-                  <div className="flex gap-1.5 flex-wrap">
-                    {COLOR_OPTIONS.map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        className={`h-6 w-6 rounded-full border-2 transition-all ${prof.cor_identificacao === c ? "border-foreground scale-110" : "border-transparent"}`}
-                        style={{ backgroundColor: c }}
-                        onClick={() => updateColor.mutate({ id: prof.id, cor_identificacao: c })}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <ProfessionalCard key={prof.id} prof={prof} onUpdate={invalidate} />
           ))}
         </div>
       )}

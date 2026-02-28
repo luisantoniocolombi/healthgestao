@@ -98,6 +98,7 @@ Deno.serve(async (req) => {
         cor_identificacao: invitation.cor_identificacao || "#3b82f6",
         conta_principal_id: adminId,
         ativo: true,
+        email: userEmail,
       }, { onConflict: "id" });
 
     if (profileError) {
