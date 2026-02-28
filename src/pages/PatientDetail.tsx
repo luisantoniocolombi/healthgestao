@@ -51,35 +51,41 @@ export default function PatientDetail() {
 
   const fetchAll = async () => {
     if (!user || !id) return;
+    try {
+      const [patientRes, condRes, apptRes, recRes, noteRes] = await Promise.all([
+        supabase.from("patients").select("*").eq("id", id).maybeSingle(),
+        supabase.from("conditions").select("*").eq("patient_id", id).eq("archived", false).order("data_inicio", { ascending: false }),
+        supabase.from("appointments").select("*").eq("patient_id", id).eq("archived", false).order("data_atendimento", { ascending: false }),
+        supabase.from("receivables").select("*").eq("patient_id", id).eq("archived", false).order("data_cobranca", { ascending: false }),
+        supabase.from("clinical_notes").select("*").eq("patient_id", id).eq("archived", false).order("data_nota", { ascending: false }),
+      ]);
 
-    const [patientRes, condRes, apptRes, recRes, noteRes] = await Promise.all([
-      supabase.from("patients").select("*").eq("id", id).maybeSingle(),
-      supabase.from("conditions").select("*").eq("patient_id", id).eq("archived", false).order("data_inicio", { ascending: false }),
-      supabase.from("appointments").select("*").eq("patient_id", id).eq("archived", false).order("data_atendimento", { ascending: false }),
-      supabase.from("receivables").select("*").eq("patient_id", id).eq("archived", false).order("data_cobranca", { ascending: false }),
-      supabase.from("clinical_notes").select("*").eq("patient_id", id).eq("archived", false).order("data_nota", { ascending: false }),
-    ]);
+      if (patientRes.error) {
+        console.error("Erro ao carregar paciente:", patientRes.error);
+        toast.error("Erro ao carregar paciente");
+        setLoading(false);
+        return;
+      }
 
-    if (patientRes.error) {
-      console.error("Erro ao carregar paciente:", patientRes.error);
+      if (patientRes.data) {
+        const p = patientRes.data as Patient;
+        setPatient(p);
+        setForm(p);
+      }
+      if (condRes.error) console.error("Erro condições:", condRes.error);
+      if (apptRes.error) console.error("Erro atendimentos:", apptRes.error);
+      if (recRes.error) console.error("Erro recebíveis:", recRes.error);
+      if (noteRes.error) console.error("Erro notas:", noteRes.error);
+      setConditions((condRes.data || []) as Condition[]);
+      setAppointments((apptRes.data || []) as Appointment[]);
+      setReceivables((recRes.data || []) as Receivable[]);
+      setClinicalNotes((noteRes.data || []) as ClinicalNote[]);
+    } catch (err) {
+      console.error("Erro ao carregar dados:", err);
+      toast.error("Erro ao carregar dados do paciente");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    if (patientRes.data) {
-      const p = patientRes.data as Patient;
-      setPatient(p);
-      setForm(p);
-    }
-    if (condRes.error) console.error("Erro condições:", condRes.error);
-    if (apptRes.error) console.error("Erro atendimentos:", apptRes.error);
-    if (recRes.error) console.error("Erro recebíveis:", recRes.error);
-    if (noteRes.error) console.error("Erro notas:", noteRes.error);
-    setConditions((condRes.data || []) as Condition[]);
-    setAppointments((apptRes.data || []) as Appointment[]);
-    setReceivables((recRes.data || []) as Receivable[]);
-    setClinicalNotes((noteRes.data || []) as ClinicalNote[]);
-    setLoading(false);
   };
 
   useEffect(() => { fetchAll(); }, [user, id]);
@@ -236,19 +242,21 @@ export default function PatientDetail() {
         <TabsContent value="dados">
           <Card>
             <CardContent className="pt-6 space-y-4">
-              <div className="flex justify-end gap-2">
-                {editing ? (
-                  <>
-                    <Button size="sm" onClick={handleSave}><Save className="h-4 w-4 mr-1" />Salvar</Button>
-                    <Button size="sm" variant="outline" onClick={() => { setEditing(false); setForm(patient); }}>Cancelar</Button>
-                  </>
-                ) : (
-                  <>
-                    <Button size="sm" variant="outline" onClick={() => setEditing(true)}><Edit className="h-4 w-4 mr-1" />Editar</Button>
-                    <Button size="sm" variant="destructive" onClick={handleArchive}><Trash2 className="h-4 w-4 mr-1" />Arquivar</Button>
-                  </>
-                )}
-              </div>
+              {(isAdmin || patient.user_id === user?.id) && (
+                <div className="flex justify-end gap-2">
+                  {editing ? (
+                    <>
+                      <Button size="sm" onClick={handleSave}><Save className="h-4 w-4 mr-1" />Salvar</Button>
+                      <Button size="sm" variant="outline" onClick={() => { setEditing(false); setForm(patient); }}>Cancelar</Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button size="sm" variant="outline" onClick={() => setEditing(true)}><Edit className="h-4 w-4 mr-1" />Editar</Button>
+                      <Button size="sm" variant="destructive" onClick={handleArchive}><Trash2 className="h-4 w-4 mr-1" />Arquivar</Button>
+                    </>
+                  )}
+                </div>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2 sm:col-span-2">
                   <Label>Nome Completo</Label>

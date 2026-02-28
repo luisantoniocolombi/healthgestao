@@ -80,28 +80,35 @@ export default function Appointments() {
 
   const fetchData = async () => {
     if (!user) return;
-    const monthStart = format(startOfMonth(currentMonth), "yyyy-MM-dd");
-    const monthEnd = format(endOfMonth(currentMonth), "yyyy-MM-dd");
+    try {
+      const monthStart = format(startOfMonth(currentMonth), "yyyy-MM-dd");
+      const monthEnd = format(endOfMonth(currentMonth), "yyyy-MM-dd");
 
-    const apptQuery = supabase.from("appointments").select("*, patients(nome_completo)")
-        .eq("archived", false)
-        .gte("data_atendimento", monthStart).lte("data_atendimento", monthEnd)
-        .order("data_atendimento");
+      const apptQuery = supabase.from("appointments").select("*, patients(nome_completo)")
+          .eq("archived", false)
+          .gte("data_atendimento", monthStart).lte("data_atendimento", monthEnd)
+          .order("data_atendimento");
 
-    const patQuery = supabase.from("patients").select("id, nome_completo")
-        .eq("archived", false).order("nome_completo");
+      const patQuery = supabase.from("patients").select("id, nome_completo")
+          .eq("archived", false).order("nome_completo");
 
-    // Professional sees only own; admin sees all via RLS
-    if (!isAdmin) {
-      apptQuery.eq("user_id", user.id);
-      patQuery.eq("user_id", user.id);
+      if (!isAdmin) {
+        apptQuery.eq("user_id", user.id);
+        patQuery.eq("user_id", user.id);
+      }
+
+      const [apptRes, patRes] = await Promise.all([apptQuery, patQuery]);
+
+      if (apptRes.error) console.error("Erro atendimentos:", apptRes.error);
+      if (patRes.error) console.error("Erro pacientes:", patRes.error);
+
+      setAppointments((apptRes.data || []) as Appointment[]);
+      setPatients((patRes.data || []) as Patient[]);
+    } catch (err) {
+      console.error("Erro ao carregar dados:", err);
+    } finally {
+      setLoading(false);
     }
-
-    const [apptRes, patRes] = await Promise.all([apptQuery, patQuery]);
-
-    setAppointments((apptRes.data || []) as Appointment[]);
-    setPatients((patRes.data || []) as Patient[]);
-    setLoading(false);
   };
 
   useEffect(() => { fetchData(); }, [user, currentMonth, isAdmin]);

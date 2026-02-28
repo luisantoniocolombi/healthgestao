@@ -102,6 +102,9 @@ export interface Receivable {
 export interface Profile {
   id: string;
   nome: string;
+  email?: string;
+  cpf?: string;
+  registro_profissional?: string;
   cor_identificacao: string;
   conta_principal_id: string;
   ativo: boolean;
