@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, forwardRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,7 +18,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
-export default function PatientDetail() {
+const PatientDetail = forwardRef<HTMLDivElement, object>(function PatientDetail(_props, ref) {
   const { id } = useParams<{ id: string }>();
   const { user, isAdmin } = useAuth();
   const { profileMap } = useAccountProfiles();
@@ -28,13 +28,11 @@ export default function PatientDetail() {
   const [form, setForm] = useState<Partial<Patient>>({});
   const [loading, setLoading] = useState(true);
 
-  // Sub-data
   const [conditions, setConditions] = useState<Condition[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [receivables, setReceivables] = useState<Receivable[]>([]);
   const [clinicalNotes, setClinicalNotes] = useState<ClinicalNote[]>([]);
 
-  // Dialogs
   const [conditionDialog, setConditionDialog] = useState(false);
   const [noteDialog, setNoteDialog] = useState(false);
   const [receivableDialog, setReceivableDialog] = useState(false);
@@ -42,10 +40,7 @@ export default function PatientDetail() {
   const [newNote, setNewNote] = useState({ data_nota: format(new Date(), "yyyy-MM-dd"), texto_nota: "" });
   const [newReceivable, setNewReceivable] = useState({ data_cobranca: format(new Date(), "yyyy-MM-dd"), valor: "", forma_pagamento: "", observacao: "" });
 
-  // Financial filter
   const [financeMonth, setFinanceMonth] = useState(format(new Date(), "yyyy-MM"));
-
-  // Evolution export filter
   const [evoStart, setEvoStart] = useState("");
   const [evoEnd, setEvoEnd] = useState("");
 
@@ -175,15 +170,13 @@ export default function PatientDetail() {
 
   const update = (field: string, value: string) => setForm((prev) => ({ ...prev, [field]: value }));
 
-  if (loading) return <div className="text-center py-12 text-muted-foreground">Carregando...</div>;
-  if (!patient) return <div className="text-center py-12">Paciente não encontrado</div>;
+  if (loading) return <div ref={ref} className="text-center py-12 text-muted-foreground">Carregando...</div>;
+  if (!patient) return <div ref={ref} className="text-center py-12">Paciente não encontrado</div>;
 
-  // Financial filter
   const filteredReceivables = receivables.filter(r => r.data_cobranca.startsWith(financeMonth));
   const totalPago = filteredReceivables.filter(r => r.status_pagamento === "pago").reduce((s, r) => s + Number(r.valor), 0);
   const totalPendente = filteredReceivables.filter(r => r.status_pagamento === "pendente").reduce((s, r) => s + Number(r.valor), 0);
 
-  // Evolution items with optional date filter
   const allEvoItems = [
     ...appointments.map(a => ({ type: "appointment" as const, date: a.data_atendimento, data: a })),
     ...clinicalNotes.map(n => ({ type: "note" as const, date: n.data_nota, data: n })),
@@ -219,7 +212,7 @@ export default function PatientDetail() {
   };
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div ref={ref} className="space-y-6 max-w-4xl">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => navigate("/pacientes")}>
           <ArrowLeft className="h-4 w-4" />
@@ -463,7 +456,6 @@ export default function PatientDetail() {
         {/* ABA 4 - FINANCEIRO */}
         <TabsContent value="financeiro">
           <div className="space-y-4">
-            {/* Month filter */}
             <div className="flex items-center gap-3">
               <Label className="text-sm font-medium">Mês:</Label>
               <Input type="month" value={financeMonth} onChange={(e) => setFinanceMonth(e.target.value)} className="w-auto" />
@@ -540,4 +532,6 @@ export default function PatientDetail() {
       </Tabs>
     </div>
   );
-}
+});
+
+export default PatientDetail;

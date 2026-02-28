@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, forwardRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 
-export default function PatientForm() {
+const PatientForm = forwardRef<HTMLDivElement, object>(function PatientForm(_props, ref) {
   const { user, isAdmin } = useAuth();
   const { profileMap } = useAccountProfiles();
   const navigate = useNavigate();
@@ -60,7 +60,7 @@ export default function PatientForm() {
     setForm((prev) => ({ ...prev, [field]: value }));
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div ref={ref} className="space-y-6 max-w-2xl">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => navigate("/pacientes")}>
           <ArrowLeft className="h-4 w-4" />
@@ -197,4 +197,6 @@ export default function PatientForm() {
       </Card>
     </div>
   );
-}
+});
+
+export default PatientForm;

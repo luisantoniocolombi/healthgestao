@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, forwardRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Search, Users } from "lucide-react";
 import { toast } from "sonner";
 
-export default function Patients() {
+const Patients = forwardRef<HTMLDivElement, object>(function Patients(_props, ref) {
   const { user } = useAuth();
   const { profileMap, isAdmin } = useAccountProfiles();
   const navigate = useNavigate();
@@ -73,7 +73,7 @@ export default function Patients() {
   });
 
   return (
-    <div className="space-y-6">
+    <div ref={ref} className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <Users className="h-6 w-6 text-primary" />
@@ -159,4 +159,6 @@ export default function Patients() {
       )}
     </div>
   );
-}
+});
+
+export default Patients;
