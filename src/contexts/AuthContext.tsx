@@ -54,17 +54,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
-    let initialSessionHandled = false;
+    let initialLoadDone = false;
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         if (!mounted) return;
 
-        // Skip if this is the initial session and getSession already handled it
-        if (!initialSessionHandled) {
-          initialSessionHandled = true;
-          return;
-        }
+        console.log("[Auth] onAuthStateChange:", _event, !!session);
 
         setSession(session);
         setUser(session?.user ?? null);
@@ -76,13 +72,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setRole(null);
         }
 
+        initialLoadDone = true;
         if (mounted) setLoading(false);
       }
     );
 
-    // Bootstrap initial session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!mounted) return;
+    // Fallback: se INITIAL_SESSION nao disparar em 2s, usar getSession
+    const fallbackTimer = setTimeout(async () => {
+      if (!mounted || initialLoadDone) return;
+      console.log("[Auth] Fallback: using getSession");
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!mounted || initialLoadDone) return;
 
       setSession(session);
       setUser(session?.user ?? null);
@@ -92,10 +93,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (mounted) setLoading(false);
-    });
+    }, 2000);
 
     return () => {
       mounted = false;
+      clearTimeout(fallbackTimer);
       subscription.unsubscribe();
     };
   }, []);
