@@ -13,7 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { ArrowLeft, CalendarDays, Plus, Mic, MicOff, Copy, Check, RotateCcw, AlertTriangle, Trash2 } from "lucide-react";
+import { ArrowLeft, CalendarDays, Plus, Mic, MicOff, Copy, Check, CheckCircle, RotateCcw, AlertTriangle, Trash2 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, addDays } from "date-fns";
@@ -260,9 +261,43 @@ const Appointments = forwardRef<HTMLDivElement, object>(function Appointments(_p
                         {profNome && <p className="text-xs text-muted-foreground">{profNome}</p>}
                       </div>
                     </div>
-                    <Badge variant={a.status === "realizado" ? "default" : a.status === "cancelado" ? "destructive" : "secondary"}>
-                      {a.status}
-                    </Badge>
+                    {a.status === "agendado" ? (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge
+                              variant="secondary"
+                              className="cursor-pointer group/badge hover:bg-green-500 hover:text-white transition-colors"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                const { error } = await supabase
+                                  .from("appointments")
+                                  .update({ status: "realizado" })
+                                  .eq("id", a.id);
+                                if (error) {
+                                  toast.error("Erro ao atualizar status");
+                                  return;
+                                }
+                                setAppointments(prev =>
+                                  prev.map(ap => ap.id === a.id ? { ...ap, status: "realizado" } : ap)
+                                );
+                                toast.success("Atendimento marcado como realizado");
+                              }}
+                            >
+                              <span className="group-hover/badge:hidden">agendado</span>
+                              <span className="hidden group-hover/badge:inline-flex items-center gap-1">
+                                <CheckCircle className="h-3 w-3" /> realizado
+                              </span>
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>Clique para marcar como realizado</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    ) : (
+                      <Badge variant={a.status === "realizado" ? "default" : "destructive"}>
+                        {a.status}
+                      </Badge>
+                    )}
                   </div>
                 );
               });
