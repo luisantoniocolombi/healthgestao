@@ -1,33 +1,41 @@
 
 
-# Fix: Restore getSession + keep race condition protection
+# Diagnostico e correcao definitiva do AuthContext
 
-## Root cause
-The previous fix removed `getSession()`, but `onAuthStateChange` doesn't always fire immediately on page load with a persisted session. Result: `loading` stays `true` forever → user sees "Carregando..." and never gets past it.
+## Problema identificado
 
-## Solution
+O `initialSessionHandled` flag no AuthContext esta causando uma race condition. O flag assume que `onAuthStateChange` SEMPRE dispara antes de `getSession` resolver, mas isso nao e garantido. Em alguns cenarios:
 
-### File: `src/contexts/AuthContext.tsx`
-Restore the proper initialization pattern:
-1. Set up `onAuthStateChange` listener first (for subsequent auth events)
-2. Call `getSession()` to bootstrap the initial session
-3. In both paths, **await** `fetchProfileAndRole` before setting `loading = false`
-4. Use a flag to prevent the double-fire race condition (both `getSession` and `onAuthStateChange` firing for the same initial session)
+1. `onAuthStateChange` dispara `INITIAL_SESSION` → flag pula o evento
+2. `getSession` resolve → configura tudo corretamente
+3. Logo apos, `TOKEN_REFRESHED` dispara → handler processa normalmente
+
+Mas em OUTROS cenarios (token expirado, rede lenta):
+1. `getSession` resolve PRIMEIRO com sessao nula ou stale
+2. `onAuthStateChange` dispara depois → MAS o flag ja esta false, entao o PRIMEIRO evento e pulado
+3. Resultado: dados carregam com sessao incompleta ou `user` fica null
+
+## Solucao
+
+### Arquivo: `src/contexts/AuthContext.tsx`
+
+Remover o flag `initialSessionHandled` completamente. Usar o padrao robusto e simples:
+
+1. `onAuthStateChange` processa TODOS os eventos (sem pular nenhum)
+2. `getSession` so e usado como fallback para o caso raro de `INITIAL_SESSION` nao disparar
+3. Usar uma flag `initialLoadDone` para evitar que `getSession` sobrescreva dados ja carregados por `onAuthStateChange`
+4. Adicionar console.logs temporarios para diagnostico
 
 ```tsx
 useEffect(() => {
   let mounted = true;
-  let initialSessionHandled = false;
+  let initialLoadDone = false;
 
   const { data: { subscription } } = supabase.auth.onAuthStateChange(
     async (_event, session) => {
       if (!mounted) return;
-      
-      // Skip if this is the initial session and getSession already handled it
-      if (!initialSessionHandled) {
-        initialSessionHandled = true;
-        return; // getSession below will handle the first load
-      }
+
+      console.log("[Auth] onAuthStateChange:", _event, !!session);
 
       setSession(session);
       setUser(session?.user ?? null);
@@ -39,14 +47,19 @@ useEffect(() => {
         setRole(null);
       }
 
+      initialLoadDone = true;
       if (mounted) setLoading(false);
     }
   );
 
-  // Bootstrap initial session
-  supabase.auth.getSession().then(async ({ data: { session } }) => {
-    if (!mounted) return;
-    
+  // Fallback: se INITIAL_SESSION nao disparar em 2s, usar getSession
+  const fallbackTimer = setTimeout(async () => {
+    if (!mounted || initialLoadDone) return;
+    console.log("[Auth] Fallback: using getSession");
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!mounted || initialLoadDone) return;
+
     setSession(session);
     setUser(session?.user ?? null);
 
@@ -55,14 +68,20 @@ useEffect(() => {
     }
 
     if (mounted) setLoading(false);
-  });
+  }, 2000);
 
   return () => {
     mounted = false;
+    clearTimeout(fallbackTimer);
     subscription.unsubscribe();
   };
 }, []);
 ```
 
-This restores the working initialization while keeping the fix that ensures profile/role are loaded before `loading` becomes `false`.
+Esta abordagem garante que:
+- `onAuthStateChange` e o caminho primario (processa tudo, incluindo `INITIAL_SESSION`)
+- Se por algum motivo `INITIAL_SESSION` nao disparar em 2 segundos, `getSession` assume como fallback
+- Nenhum evento e pulado
+- `loading` so vira `false` apos profile e role estarem carregados
+- Console logs ajudam a diagnosticar se o problema persistir
 
