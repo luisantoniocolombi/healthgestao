@@ -1,33 +1,48 @@
 
 
-# Tabela Resumo por Paciente no Financeiro
+# Fluxo de Caixa - Proposta de Implementação
 
-Adicionar uma seção de tabela consolidada abaixo dos cards de dashboard e acima da listagem de recebíveis individuais, usando os dados já carregados (receivables + appointments do mês).
+## Conceito
 
-## Implementacao
+Uma nova página "Fluxo de Caixa" visível apenas para o admin, com controle mensal de entradas (recebíveis pagos) e saídas (despesas da clínica), mostrando saldo do período.
 
-### 1. Buscar appointments do mes junto com receivables
-No `fetchData`, adicionar query de `appointments` filtrada pelo mesmo periodo do mes, para contar atendimentos e dias por paciente.
+## Banco de dados
 
-### 2. Montar dados consolidados por paciente
-Agrupar receivables por `patient_id`, calcular:
-- Nome do paciente (ordem alfabetica)
-- Total de atendimentos no mes (da query de appointments)
-- Dias dos atendimentos (lista de datas formatadas)
-- Total a receber (soma dos receivables pendentes)
+### Nova tabela: `expenses` (contas a pagar)
+- `id`, `user_id`, `conta_principal_id`
+- `descricao` (text) - ex: "Aluguel", "Material"
+- `categoria` (text) - ex: "Fixo", "Variável", "Pessoal"
+- `valor` (numeric)
+- `data_vencimento` (date)
+- `data_pagamento` (date, nullable)
+- `status` (text: "pendente" | "pago" | "cancelado")
+- `forma_pagamento` (text, nullable)
+- `observacao` (text, nullable)
+- `archived`, `created_at`, `updated_at`
+- RLS: apenas admin da conta pode ler/escrever
 
-### 3. Renderizar tabela com Table/TableHeader/TableBody
-Usar os componentes `Table` ja existentes em `src/components/ui/table.tsx`. Colunas:
-- **Paciente** (nome alfabetico)
-- **Atendimentos** (quantidade)
-- **Dias** (datas separadas por virgula)
-- **Total a Receber** (R$)
+### Sem alteração na tabela `receivables`
+As entradas no fluxo de caixa são calculadas automaticamente a partir dos recebíveis com `status_pagamento = 'pago'` no mês selecionado.
 
-Linha de rodape com total geral.
+## Frontend
 
-### 4. Posicionamento
-A tabela fica entre os filtros e a listagem de cards individuais, dentro de um Card com titulo "Resumo por Paciente".
+### Nova página: `/fluxo-de-caixa` (apenas admin)
+- Seletor de mês
+- 3 cards resumo: **Total Entradas** (recebíveis pagos), **Total Saídas** (despesas pagas), **Saldo**
+- Tabela unificada em ordem cronológica com colunas: Data, Descrição, Tipo (Entrada/Saída), Valor, Status
+  - Entradas: puxadas de `receivables` onde `status_pagamento = 'pago'` e `data_pagamento` no mês
+  - Saídas: puxadas de `expenses`
+- Botão "Nova Despesa" abre dialog para cadastrar conta a pagar
+- Ações nas despesas: marcar como pago, cancelar, editar
+- Filtros por tipo (entrada/saída) e categoria
 
-### Arquivo afetado
-- `src/pages/Financial.tsx` -- adicionar query de appointments, logica de agrupamento e componente Table
+### Sidebar
+- Novo item "Fluxo de Caixa" visível apenas quando `isAdmin = true`
+
+## Arquivos afetados
+- Migração SQL: criar tabela `expenses` + RLS
+- `src/pages/CashFlow.tsx` (novo)
+- `src/App.tsx` - nova rota
+- `src/components/AppSidebar.tsx` - novo link admin-only
+- `src/types/index.ts` - tipo Expense
 
