@@ -1,20 +1,47 @@
+# Plano: Corrigir refs + Agendamento Recorrente
 
+## Parte 1 — Corrigir erro de refs (tela branca)
 
-# Corrigir tela branca na página de Profissionais
+O erro "Function components cannot be given refs" aparece em `Patients` e potencialmente em todas as paginas renderizadas via `<Outlet>` do React Router.
 
-## Problema identificado
+### Arquivos a corrigir (adicionar `forwardRef`):
 
-O console mostra dois erros de ref:
-1. "Function components cannot be given refs" para `Professionals` (React Router tenta passar ref)
-2. Mesmo erro para `Dialog` dentro de `Professionals`
+- `src/pages/Patients.tsx`
+- `src/pages/Appointments.tsx` (tanto `Appointments` quanto `AppointmentForm`)
+- `src/pages/Financial.tsx`
+- `src/pages/CashFlow.tsx`
+- `src/pages/PatientForm.tsx`
+- `src/pages/PatientDetail.tsx`
+- `src/pages/NotFound.tsx`
 
-Esses warnings podem causar crash em React 18 strict mode, ativando o ErrorBoundary e resultando na tela branca.
+Cada um segue o mesmo padrao aplicado em `Professionals`:
 
-Além disso, há warning de `DialogContent` sem `Description`/`aria-describedby`.
+```tsx
+import { forwardRef } from "react";
+const Component = forwardRef<HTMLDivElement, object>(function Component(_props, ref) {
+  // ... logica existente
+  return <div ref={ref} ...>...</div>;
+});
+export default Component;
+```
 
-## Correções em `src/pages/Professionals.tsx`
+## Parte 2 — Agendamento Recorrente
 
-1. Converter `Professionals` para usar `forwardRef` para que React Router consiga passar refs sem erro
-2. Adicionar `DialogDescription` ao `DialogContent` para eliminar o warning de acessibilidade
-3. Manter toda a lógica existente intacta
+### Alteracao em `src/pages/Appointments.tsx` (AppointmentForm)
 
+1. Adicionar dois novos campos de estado (somente para criacao, nao edicao):
+  - `repetirSemanas: boolean` (toggle)
+  - `quantidadeSemanas: number` (1-12, default 4)
+2. Na UI, apos os campos de Data e Hora, exibir:
+  - Switch "Repetir nas proximas semanas"
+  - Se ativo, Input numerico "Quantas semanas?" (1 a 12)
+  - Texto informativo: "Serao criados X atendimentos: [datas listadas]"
+3. No `handleSubmit`, se `repetirSemanas` estiver ativo:
+  - Criar o atendimento principal normalmente
+  - Usar um loop para criar N atendimentos adicionais, cada um com `data_atendimento` incrementada em 7 dias
+  - Todos com mesmo horario, paciente, status "agendado" e demais campos
+  - Recebiveis devem ser  duplicados tambem (apenas se habilitado)
+
+### Sem alteracao no banco de dados
+
+Os atendimentos recorrentes sao simplesmente multiplos registros independentes na tabela `appointments`.
