@@ -1,21 +1,71 @@
 
 
-# Correcao do bug do profissional (tela branca)
+# Correcao definitiva: Race condition no AuthContext
 
-## Causa raiz identificada
+## Diagnostico
 
-O componente `Badge` foi alterado para renderizar um `<div>`, mas em varios locais ele esta dentro de tags `<p>`. Exemplo: `PatientDetail.tsx` linha 513 coloca um `Badge` (`<div>`) dentro de um `<p>`. Isso viola a regra HTML de DOM nesting (`<div>` nao pode ser filho de `<p>`), o que em React 18 gera um erro que o `ErrorBoundary` captura, resultando na tela branca.
+Apos varredura completa, o Badge e forwardRef ja estao corretos. O problema real esta no **AuthContext** — ha uma race condition que causa comportamento diferente entre navegacao por clique (client-side) e reload (fresh load):
 
-Apos reload, o React consegue montar o DOM de forma diferente e o erro nao ocorre na primeira renderizacao. Mas qualquer acao que force re-render (re-fetch, troca de tab) dispara o erro novamente.
+1. `onAuthStateChange` E `getSession` rodam em paralelo, causando dupla inicializacao
+2. `setLoading(false)` e chamado ANTES de `fetchProfileAndRole` completar
+3. `fetchProfileAndRole` usa `setTimeout(0)`, atrasando ainda mais
+4. Resultado: componentes renderizam com `profile = null`, `role = null`, `contaPrincipalId = null` — e depois re-renderizam quando os dados chegam
 
-## Correcao
+Para o profissional, esse re-render tardio pode causar queries duplicadas, estados inconsistentes, e potencialmente o ErrorBoundary capturando um erro durante a transicao.
 
-### Arquivo 1: `src/components/ui/badge.tsx`
-- Trocar o elemento de `<div>` para `<span>` (que e inline e pode existir dentro de `<p>`)
-- Atualizar o tipo de `HTMLDivElement` para `HTMLSpanElement`
+No reload, a sequencia e diferente: `loading = true` segura a renderizacao ate tudo estar pronto, mascarando o problema.
 
-Essa unica mudanca resolve o problema em TODAS as paginas do sistema de uma vez.
+## Plano
+
+### Arquivo 1: `src/contexts/AuthContext.tsx`
+Reescrever a logica de inicializacao:
+- Usar APENAS `onAuthStateChange` (remover `getSession` separado)
+- So setar `loading = false` DEPOIS de `fetchProfileAndRole` completar
+- Remover o `setTimeout` desnecessario
+- Adicionar guard para nao resetar user durante token refresh
+
+```tsx
+useEffect(() => {
+  let mounted = true;
+
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    async (event, session) => {
+      if (!mounted) return;
+      
+      setSession(session);
+      setUser(session?.user ?? null);
+
+      if (session?.user) {
+        await fetchProfileAndRole(session.user.id);
+      } else {
+        setProfile(null);
+        setRole(null);
+      }
+      
+      if (mounted) setLoading(false);
+    }
+  );
+
+  return () => {
+    mounted = false;
+    subscription.unsubscribe();
+  };
+}, []);
+```
 
 ### Arquivo 2: `src/pages/PatientDetail.tsx`
-- Adicionar `DialogDescription` ao dialog "Novo Recebivel" (linha 480) que ainda esta faltando
+Adicionar tratamento defensivo para datas potencialmente nulas:
+- Wrapper `safeFormat` que retorna fallback em caso de data invalida
+- Aplicar em todas as chamadas `format(new Date(...))` no componente
+
+### Arquivo 3: `src/components/ErrorBoundary.tsx`
+Adicionar logging mais detalhado no `componentDidCatch` para capturar a stack trace completa caso o erro persista:
+```tsx
+componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+  console.error("ErrorBoundary caught:", error.message);
+  console.error("Component stack:", errorInfo.componentStack);
+}
+```
+
+Essa correcao garante que NENHUM componente renderize antes de ter profile e role disponiveis, eliminando a race condition que causa a tela branca.
 
