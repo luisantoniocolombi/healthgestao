@@ -54,10 +54,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+    let initialSessionHandled = false;
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         if (!mounted) return;
+
+        // Skip if this is the initial session and getSession already handled it
+        if (!initialSessionHandled) {
+          initialSessionHandled = true;
+          return;
+        }
 
         setSession(session);
         setUser(session?.user ?? null);
@@ -72,6 +79,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (mounted) setLoading(false);
       }
     );
+
+    // Bootstrap initial session
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!mounted) return;
+
+      setSession(session);
+      setUser(session?.user ?? null);
+
+      if (session?.user) {
+        await fetchProfileAndRole(session.user.id);
+      }
+
+      if (mounted) setLoading(false);
+    });
 
     return () => {
       mounted = false;
