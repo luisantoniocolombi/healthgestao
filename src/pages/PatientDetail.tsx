@@ -18,6 +18,15 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
+function safeFormat(dateStr: string | null | undefined, fmt: string, options?: { locale?: typeof ptBR }): string {
+  if (!dateStr) return "—";
+  try {
+    return format(new Date(dateStr), fmt, options);
+  } catch {
+    return "—";
+  }
+}
+
 const PatientDetail = forwardRef<HTMLDivElement, object>(function PatientDetail(_props, ref) {
   const { id } = useParams<{ id: string }>();
   const { user, isAdmin } = useAuth();
@@ -363,7 +372,7 @@ const PatientDetail = forwardRef<HTMLDivElement, object>(function PatientDetail(
                   {conditions.map((c) => (
                     <div key={c.id} className="p-3 border rounded-lg">
                       <p className="font-medium">{c.nome_condicao}</p>
-                      {c.data_inicio && <p className="text-xs text-muted-foreground">Início: {format(new Date(c.data_inicio + "T00:00:00"), "dd/MM/yyyy")}</p>}
+                      {c.data_inicio && <p className="text-xs text-muted-foreground">Início: {safeFormat(c.data_inicio + "T00:00:00", "dd/MM/yyyy")}</p>}
                       {c.observacao && <p className="text-sm text-muted-foreground mt-1">{c.observacao}</p>}
                     </div>
                   ))}
@@ -428,7 +437,7 @@ const PatientDetail = forwardRef<HTMLDivElement, object>(function PatientDetail(
                         {item.type === "appointment" ? "Atendimento" : "Nota"}
                       </Badge>
                       <span className="text-xs text-muted-foreground">
-                        {format(new Date(item.date + "T00:00:00"), "dd/MM/yyyy", { locale: ptBR })}
+                        {safeFormat(item.date + "T00:00:00", "dd/MM/yyyy", { locale: ptBR })}
                       </span>
                     </div>
                     <p className="text-sm line-clamp-3">
@@ -510,7 +519,7 @@ const PatientDetail = forwardRef<HTMLDivElement, object>(function PatientDetail(
                         <div>
                           <p className="text-sm font-medium">R$ {Number(r.valor).toFixed(2)}</p>
                           <p className="text-xs text-muted-foreground">
-                            {format(new Date(r.data_cobranca + "T00:00:00"), "dd/MM/yyyy")}
+                            {safeFormat(r.data_cobranca + "T00:00:00", "dd/MM/yyyy")}
                             {(r as any).gerar_nfe && <Badge variant="outline" className="ml-2 text-[10px]">NFe</Badge>}
                           </p>
                         </div>
