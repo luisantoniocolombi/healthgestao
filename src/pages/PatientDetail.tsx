@@ -478,6 +478,7 @@ const PatientDetail = forwardRef<HTMLDivElement, object>(function PatientDetail(
                     </DialogTrigger>
                     <DialogContent>
                       <DialogHeader><DialogTitle>Novo Recebível</DialogTitle></DialogHeader>
+                      <DialogDescription className="sr-only">Preencha os dados do novo recebível</DialogDescription>
                       <div className="space-y-3">
                         <div><Label>Data Cobrança *</Label><Input type="date" value={newReceivable.data_cobranca} onChange={(e) => setNewReceivable(p => ({ ...p, data_cobranca: e.target.value }))} /></div>
                         <div><Label>Valor (R$) *</Label><Input type="number" step="0.01" value={newReceivable.valor} onChange={(e) => setNewReceivable(p => ({ ...p, valor: e.target.value }))} /></div>
