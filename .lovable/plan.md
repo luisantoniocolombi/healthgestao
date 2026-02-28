@@ -1,37 +1,34 @@
 
 
-# Correcao definitiva: Race condition no AuthContext
+# Fix: Restore getSession + keep race condition protection
 
-## Diagnostico
+## Root cause
+The previous fix removed `getSession()`, but `onAuthStateChange` doesn't always fire immediately on page load with a persisted session. Result: `loading` stays `true` forever → user sees "Carregando..." and never gets past it.
 
-Apos varredura completa, o Badge e forwardRef ja estao corretos. O problema real esta no **AuthContext** — ha uma race condition que causa comportamento diferente entre navegacao por clique (client-side) e reload (fresh load):
+## Solution
 
-1. `onAuthStateChange` E `getSession` rodam em paralelo, causando dupla inicializacao
-2. `setLoading(false)` e chamado ANTES de `fetchProfileAndRole` completar
-3. `fetchProfileAndRole` usa `setTimeout(0)`, atrasando ainda mais
-4. Resultado: componentes renderizam com `profile = null`, `role = null`, `contaPrincipalId = null` — e depois re-renderizam quando os dados chegam
-
-Para o profissional, esse re-render tardio pode causar queries duplicadas, estados inconsistentes, e potencialmente o ErrorBoundary capturando um erro durante a transicao.
-
-No reload, a sequencia e diferente: `loading = true` segura a renderizacao ate tudo estar pronto, mascarando o problema.
-
-## Plano
-
-### Arquivo 1: `src/contexts/AuthContext.tsx`
-Reescrever a logica de inicializacao:
-- Usar APENAS `onAuthStateChange` (remover `getSession` separado)
-- So setar `loading = false` DEPOIS de `fetchProfileAndRole` completar
-- Remover o `setTimeout` desnecessario
-- Adicionar guard para nao resetar user durante token refresh
+### File: `src/contexts/AuthContext.tsx`
+Restore the proper initialization pattern:
+1. Set up `onAuthStateChange` listener first (for subsequent auth events)
+2. Call `getSession()` to bootstrap the initial session
+3. In both paths, **await** `fetchProfileAndRole` before setting `loading = false`
+4. Use a flag to prevent the double-fire race condition (both `getSession` and `onAuthStateChange` firing for the same initial session)
 
 ```tsx
 useEffect(() => {
   let mounted = true;
+  let initialSessionHandled = false;
 
   const { data: { subscription } } = supabase.auth.onAuthStateChange(
-    async (event, session) => {
+    async (_event, session) => {
       if (!mounted) return;
       
+      // Skip if this is the initial session and getSession already handled it
+      if (!initialSessionHandled) {
+        initialSessionHandled = true;
+        return; // getSession below will handle the first load
+      }
+
       setSession(session);
       setUser(session?.user ?? null);
 
@@ -41,10 +38,24 @@ useEffect(() => {
         setProfile(null);
         setRole(null);
       }
-      
+
       if (mounted) setLoading(false);
     }
   );
+
+  // Bootstrap initial session
+  supabase.auth.getSession().then(async ({ data: { session } }) => {
+    if (!mounted) return;
+    
+    setSession(session);
+    setUser(session?.user ?? null);
+
+    if (session?.user) {
+      await fetchProfileAndRole(session.user.id);
+    }
+
+    if (mounted) setLoading(false);
+  });
 
   return () => {
     mounted = false;
@@ -53,19 +64,5 @@ useEffect(() => {
 }, []);
 ```
 
-### Arquivo 2: `src/pages/PatientDetail.tsx`
-Adicionar tratamento defensivo para datas potencialmente nulas:
-- Wrapper `safeFormat` que retorna fallback em caso de data invalida
-- Aplicar em todas as chamadas `format(new Date(...))` no componente
-
-### Arquivo 3: `src/components/ErrorBoundary.tsx`
-Adicionar logging mais detalhado no `componentDidCatch` para capturar a stack trace completa caso o erro persista:
-```tsx
-componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-  console.error("ErrorBoundary caught:", error.message);
-  console.error("Component stack:", errorInfo.componentStack);
-}
-```
-
-Essa correcao garante que NENHUM componente renderize antes de ter profile e role disponiveis, eliminando a race condition que causa a tela branca.
+This restores the working initialization while keeping the fix that ensures profile/role are loaded before `loading` becomes `false`.
 
