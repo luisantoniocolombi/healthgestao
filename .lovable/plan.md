@@ -1,44 +1,33 @@
 
 
-# Auditoria Completa do Sistema
+# Plano: Atualizar status do atendimento no hover
 
-## Problemas Encontrados
+## Problema de RLS
 
-### 1. Warnings de Ref (console)
-Dois warnings persistentes no console:
-- **Badge** (`src/components/ui/badge.tsx`): componente funcional sem `forwardRef`. Aparece em CashFlow, Financial, PatientDetail, etc.
-- **Dialog** (Radix): warning em Professionals ao renderizar o Dialog.
+Atualmente, apenas o dono do atendimento (`user_id = auth.uid()`) pode fazer UPDATE. Admins só têm SELECT. Preciso adicionar uma policy de UPDATE para admins.
 
-Esses warnings **nao causam crash** — sao avisos do React. A tela branca anterior ja foi corrigida com o `forwardRef` nas paginas. Porem e boa pratica corrigir para limpar o console.
+## Alterações
 
-### 2. Dialogs sem DialogDescription (acessibilidade)
-Varios dialogs estao sem `DialogDescription`, gerando warnings no console:
-- `Financial.tsx` — dialog "Novo Recebivel"
-- `PatientDetail.tsx` — dialogs "Nova Condicao" e "Nova Nota Clinica"
-- `CashFlow.tsx` — dialog "Nova Despesa/Receita"
+### 1. Migration: Adicionar policy de UPDATE para admins em `appointments`
 
-### 3. Sem outros erros criticos
-- Todas as paginas ja tem `forwardRef` ✓
-- ErrorBoundary com key por rota ✓
-- AuthContext com loading state ✓
-- RLS policies cobrindo todas as tabelas ✓
-- Rotas protegidas ✓
+```sql
+CREATE POLICY "Admins update appointments in same account"
+ON public.appointments
+FOR UPDATE
+TO authenticated
+USING (has_role(auth.uid(), 'admin'::app_role) AND is_same_account(user_id))
+WITH CHECK (has_role(auth.uid(), 'admin'::app_role) AND is_same_account(user_id));
+```
 
----
+### 2. UI em `src/pages/Appointments.tsx`
 
-## Plano de Correcao
+Na lista diária de atendimentos (linhas ~246-268), quando o status for `"agendado"`:
 
-### Arquivo 1: `src/components/ui/badge.tsx`
-- Converter Badge para usar `forwardRef` (elimina warning em todas as paginas)
+- Ao passar o mouse sobre o Badge de status, mostrar um botão/ícone de check para marcar como `"realizado"`
+- Ao clicar, chamar `supabase.from("appointments").update({ status: "realizado" }).eq("id", a.id)` e atualizar o estado local
+- Usar um `DropdownMenu` ou simplesmente um clique direto no Badge com tooltip para trocar o status
+- Impedir propagação do click para não navegar ao detalhe do atendimento
+- Após sucesso, atualizar a lista localmente (sem reload)
 
-### Arquivo 2: `src/pages/Financial.tsx`
-- Importar `DialogDescription` e adicionar ao dialog "Novo Recebivel"
-
-### Arquivo 3: `src/pages/PatientDetail.tsx`
-- Importar `DialogDescription` e adicionar aos dialogs "Nova Condicao" e "Nova Nota Clinica"
-
-### Arquivo 4: `src/pages/CashFlow.tsx`
-- Importar `DialogDescription` e adicionar ao dialog de despesa/receita
-
-Essas correcoes eliminam todos os warnings do console e deixam o sistema limpo para uso.
+A interação será: hover no Badge "agendado" → Badge muda visual (ex: ícone de check aparece) → clique → status atualizado para "realizado" com toast de confirmação.
 
