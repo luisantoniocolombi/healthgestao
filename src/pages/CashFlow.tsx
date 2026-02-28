@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, forwardRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Receivable } from "@/types";
@@ -45,7 +45,7 @@ interface CashFlowEntry {
 
 const categorias = ["Fixo", "Variável", "Pessoal", "Material", "Outro"];
 
-export default function CashFlow() {
+const CashFlow = forwardRef<HTMLDivElement, object>(function CashFlow(_props, ref) {
   const { user, contaPrincipalId } = useAuth();
   const [month, setMonth] = useState(() => format(new Date(), "yyyy-MM"));
   const [receivables, setReceivables] = useState<Receivable[]>([]);
@@ -247,7 +247,7 @@ export default function CashFlow() {
     v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
   return (
-    <div className="space-y-6">
+    <div ref={ref} className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-2xl font-bold text-foreground">Fluxo de Caixa</h1>
         <div className="flex gap-2">
@@ -437,4 +437,6 @@ export default function CashFlow() {
       </Dialog>
     </div>
   );
-}
+});
+
+export default CashFlow;

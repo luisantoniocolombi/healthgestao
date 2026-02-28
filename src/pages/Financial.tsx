@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, forwardRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
-export default function Financial() {
+const Financial = forwardRef<HTMLDivElement, object>(function Financial(_props, ref) {
   const { user } = useAuth();
   const { profileMap, isAdmin } = useAccountProfiles();
   const navigate = useNavigate();
@@ -150,7 +150,7 @@ export default function Financial() {
   };
 
   return (
-    <div className="space-y-6">
+    <div ref={ref} className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <DollarSign className="h-6 w-6 text-primary" />
@@ -237,17 +237,14 @@ export default function Financial() {
 
       {/* Resumo por Paciente */}
       {!loading && (() => {
-        // Build summary per patient from receivables (pendente) + appointments
         const patientMap = new Map<string, { nome: string; totalReceber: number; atendimentos: number; dias: string[] }>();
 
-        // Aggregate receivables pendentes
         filtered.filter(r => r.status_pagamento === "pendente").forEach(r => {
           const entry = patientMap.get(r.patient_id) || { nome: (r as any).patients?.nome_completo || "—", totalReceber: 0, atendimentos: 0, dias: [] };
           entry.totalReceber += Number(r.valor);
           patientMap.set(r.patient_id, entry);
         });
 
-        // Aggregate appointments
         appointments.forEach(a => {
           const entry = patientMap.get(a.patient_id) || { nome: a.patients?.nome_completo || "—", totalReceber: 0, atendimentos: 0, dias: [] };
           entry.atendimentos += 1;
@@ -350,4 +347,6 @@ export default function Financial() {
       )}
     </div>
   );
-}
+});
+
+export default Financial;

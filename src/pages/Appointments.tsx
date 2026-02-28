@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, forwardRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,7 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { ArrowLeft, CalendarDays, Plus, Mic, MicOff, Copy, Check, RotateCcw, AlertTriangle, Trash2 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 // ========== SPEECH HOOK ==========
@@ -66,7 +66,7 @@ function useSpeechRecognition() {
 }
 
 // ========== APPOINTMENTS PAGE ==========
-export default function Appointments() {
+const Appointments = forwardRef<HTMLDivElement, object>(function Appointments(_props, ref) {
   const { user } = useAuth();
   const { profileMap, isAdmin } = useAccountProfiles();
   const navigate = useNavigate();
@@ -126,7 +126,7 @@ export default function Appointments() {
     filteredAppointments.filter(a => isSameDay(new Date(a.data_atendimento + "T00:00:00"), date));
 
   return (
-    <div className="space-y-6">
+    <div ref={ref} className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <CalendarDays className="h-6 w-6 text-primary" />
@@ -271,10 +271,12 @@ export default function Appointments() {
       </Card>
     </div>
   );
-}
+});
+
+export default Appointments;
 
 // ========== APPOINTMENT FORM ==========
-export function AppointmentForm() {
+export const AppointmentForm = forwardRef<HTMLDivElement, object>(function AppointmentForm(_props, ref) {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const { profileMap, isAdmin } = useAccountProfiles();
@@ -301,6 +303,10 @@ export function AppointmentForm() {
     valor: "",
     observacao: "",
   });
+
+  // Recurring appointment (only for new)
+  const [repetirSemanas, setRepetirSemanas] = useState(false);
+  const [quantidadeSemanas, setQuantidadeSemanas] = useState(4);
 
   const speech = useSpeechRecognition();
   const [showPrivacyNotice, setShowPrivacyNotice] = useState(false);
@@ -419,7 +425,83 @@ export function AppointmentForm() {
       }
     }
 
-    toast.success(id ? "Atendimento atualizado!" : "Atendimento salvo!");
+    // Create recurring appointments if toggled (only for new)
+    if (!id && repetirSemanas && quantidadeSemanas > 0) {
+      const baseDate = new Date(form.data_atendimento + "T00:00:00");
+      for (let i = 1; i <= quantidadeSemanas; i++) {
+        const nextDate = format(addDays(baseDate, i * 7), "yyyy-MM-dd");
+        const recurPayload = {
+          patient_id: form.patient_id,
+          data_atendimento: nextDate,
+          hora: form.hora || null,
+          texto_prontuario: "",
+          status: "agendado",
+          gerar_nfe: form.gerar_nfe,
+          profissional_parceiro_id: form.profissional_parceiro_id || null,
+          percentual_parceiro: form.profissional_parceiro_id ? parseFloat(form.percentual_parceiro) : null,
+          user_id: user.id,
+          created_by: user.id,
+          updated_by: user.id,
+        };
+
+        const { data: recurData, error: recurError } = await supabase.from("appointments").insert(recurPayload).select("id").single();
+        if (recurError) {
+          console.error(`Erro ao criar atendimento recorrente semana ${i}:`, recurError);
+          continue;
+        }
+
+        // Duplicate receivables for recurring appointments if enabled
+        if (createReceivable && receivableForm.valor && recurData) {
+          const totalValor = parseFloat(receivableForm.valor);
+          if (form.profissional_parceiro_id) {
+            const pct = parseFloat(form.percentual_parceiro) / 100;
+            const valorParceiro = totalValor * pct;
+            const valorPrincipal = totalValor - valorParceiro;
+            await Promise.all([
+              supabase.from("receivables").insert({
+                user_id: user.id,
+                patient_id: form.patient_id,
+                appointment_id: recurData.id,
+                data_cobranca: nextDate,
+                valor: valorPrincipal,
+                observacao: receivableForm.observacao || null,
+                origem: "atendimento",
+                gerar_nfe: form.gerar_nfe,
+                created_by: user.id,
+                updated_by: user.id,
+              }),
+              supabase.from("receivables").insert({
+                user_id: form.profissional_parceiro_id,
+                patient_id: form.patient_id,
+                appointment_id: recurData.id,
+                data_cobranca: nextDate,
+                valor: valorParceiro,
+                observacao: `Parceiro - ${receivableForm.observacao || ""}`.trim(),
+                origem: "atendimento",
+                gerar_nfe: form.gerar_nfe,
+                created_by: user.id,
+                updated_by: user.id,
+              }),
+            ]);
+          } else {
+            await supabase.from("receivables").insert({
+              user_id: user.id,
+              patient_id: form.patient_id,
+              appointment_id: recurData.id,
+              data_cobranca: nextDate,
+              valor: totalValor,
+              observacao: receivableForm.observacao || null,
+              origem: "atendimento",
+              gerar_nfe: form.gerar_nfe,
+              created_by: user.id,
+              updated_by: user.id,
+            });
+          }
+        }
+      }
+    }
+
+    toast.success(id ? "Atendimento atualizado!" : repetirSemanas ? `${quantidadeSemanas + 1} atendimentos criados!` : "Atendimento salvo!");
     navigate("/atendimentos");
     setLoading(false);
   };
@@ -438,7 +520,7 @@ export function AppointmentForm() {
   const update = (field: string, value: string) => setForm(prev => ({ ...prev, [field]: value }));
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div ref={ref} className="space-y-6 max-w-2xl">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => navigate("/atendimentos")}>
           <ArrowLeft className="h-4 w-4" />
@@ -484,7 +566,36 @@ export function AppointmentForm() {
               </div>
             </div>
 
-            {/* Prontuário + Speech */}
+            {/* Recurring appointment toggle - only for new */}
+            {!id && (
+              <div className="space-y-3 p-4 border rounded-lg">
+                <div className="flex items-center gap-3">
+                  <Switch checked={repetirSemanas} onCheckedChange={setRepetirSemanas} />
+                  <Label>Repetir nas próximas semanas</Label>
+                </div>
+                {repetirSemanas && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Quantas semanas? (1 a 12)</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={12}
+                        value={quantidadeSemanas}
+                        onChange={(e) => setQuantidadeSemanas(Math.min(12, Math.max(1, parseInt(e.target.value) || 1)))}
+                      />
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Serão criados <strong>{quantidadeSemanas + 1}</strong> atendimentos:{" "}
+                      {Array.from({ length: quantidadeSemanas + 1 }, (_, i) =>
+                        format(addDays(new Date(form.data_atendimento + "T00:00:00"), i * 7), "dd/MM")
+                      ).join(", ")}
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label>Prontuário</Label>
@@ -652,4 +763,4 @@ export function AppointmentForm() {
       </Card>
     </div>
   );
-}
+});
