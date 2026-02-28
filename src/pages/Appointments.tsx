@@ -348,12 +348,9 @@ export const AppointmentForm = forwardRef<HTMLDivElement, object>(function Appoi
 
   useEffect(() => {
     if (!user) return;
-    let patQ = supabase.from("patients").select("id, nome_completo")
-      .eq("archived", false).order("nome_completo");
-    if (!isAdmin) {
-      patQ = patQ.eq("user_id", user.id);
-    }
-    patQ.then(({ data }) => setPatients((data || []) as Patient[]));
+    supabase.from("patients").select("id, nome_completo")
+      .eq("archived", false).order("nome_completo")
+      .then(({ data }) => setPatients((data || []) as Patient[]));
 
     if (id) {
       supabase.from("appointments").select("*").eq("id", id).maybeSingle()
