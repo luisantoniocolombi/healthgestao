@@ -112,6 +112,23 @@ export interface Profile {
   updated_at: string;
 }
 
+export interface Expense {
+  id: string;
+  user_id: string;
+  conta_principal_id: string;
+  descricao: string;
+  categoria: string;
+  valor: number;
+  data_vencimento: string;
+  data_pagamento?: string | null;
+  status: 'pendente' | 'pago' | 'cancelado';
+  forma_pagamento?: string | null;
+  observacao?: string | null;
+  archived: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export type AppRole = 'admin' | 'profissional';
 
 export interface UserRole {

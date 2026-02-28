@@ -185,6 +185,57 @@ export type Database = {
           },
         ]
       }
+      expenses: {
+        Row: {
+          archived: boolean
+          categoria: string
+          conta_principal_id: string
+          created_at: string
+          data_pagamento: string | null
+          data_vencimento: string
+          descricao: string
+          forma_pagamento: string | null
+          id: string
+          observacao: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          valor: number
+        }
+        Insert: {
+          archived?: boolean
+          categoria?: string
+          conta_principal_id: string
+          created_at?: string
+          data_pagamento?: string | null
+          data_vencimento: string
+          descricao: string
+          forma_pagamento?: string | null
+          id?: string
+          observacao?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          valor: number
+        }
+        Update: {
+          archived?: boolean
+          categoria?: string
+          conta_principal_id?: string
+          created_at?: string
+          data_pagamento?: string | null
+          data_vencimento?: string
+          descricao?: string
+          forma_pagamento?: string | null
+          id?: string
+          observacao?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          valor?: number
+        }
+        Relationships: []
+      }
       invitations: {
         Row: {
           admin_id: string
