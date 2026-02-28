@@ -12,7 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ArrowLeft, Edit, Save, Plus, FileText, Trash2, Download } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -346,7 +346,7 @@ const PatientDetail = forwardRef<HTMLDivElement, object>(function PatientDetail(
                     <Button size="sm"><Plus className="h-4 w-4 mr-1" />Nova Condição</Button>
                   </DialogTrigger>
                   <DialogContent>
-                    <DialogHeader><DialogTitle>Nova Condição</DialogTitle></DialogHeader>
+                    <DialogHeader><DialogTitle>Nova Condição</DialogTitle><DialogDescription>Adicione uma condição clínica ao paciente.</DialogDescription></DialogHeader>
                     <div className="space-y-3">
                       <div><Label>Nome *</Label><Input value={newCondition.nome_condicao} onChange={(e) => setNewCondition(p => ({ ...p, nome_condicao: e.target.value }))} /></div>
                       <div><Label>Data Início</Label><Input type="date" value={newCondition.data_inicio} onChange={(e) => setNewCondition(p => ({ ...p, data_inicio: e.target.value }))} /></div>
@@ -388,7 +388,7 @@ const PatientDetail = forwardRef<HTMLDivElement, object>(function PatientDetail(
                       <Button size="sm" variant="outline"><Plus className="h-4 w-4 mr-1" />Nota Avulsa</Button>
                     </DialogTrigger>
                     <DialogContent>
-                      <DialogHeader><DialogTitle>Nova Nota Clínica</DialogTitle></DialogHeader>
+                      <DialogHeader><DialogTitle>Nova Nota Clínica</DialogTitle><DialogDescription>Registre uma nova nota clínica para o paciente.</DialogDescription></DialogHeader>
                       <div className="space-y-3">
                         <div><Label>Data *</Label><Input type="date" value={newNote.data_nota} onChange={(e) => setNewNote(p => ({ ...p, data_nota: e.target.value }))} /></div>
                         <div><Label>Texto *</Label><Textarea value={newNote.texto_nota} onChange={(e) => setNewNote(p => ({ ...p, texto_nota: e.target.value }))} rows={4} /></div>

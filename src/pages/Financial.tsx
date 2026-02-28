@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableHeader, TableBody, TableFooter, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { CardHeader, CardTitle } from "@/components/ui/card";
 import { DollarSign, Plus, Search, Check, X, Edit } from "lucide-react";
@@ -163,7 +163,7 @@ const Financial = forwardRef<HTMLDivElement, object>(function Financial(_props, 
               <Button><Plus className="h-4 w-4 mr-2" />Novo Recebível</Button>
             </DialogTrigger>
             <DialogContent>
-              <DialogHeader><DialogTitle>Novo Recebível</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle>Novo Recebível</DialogTitle><DialogDescription>Preencha os dados para criar um novo recebível.</DialogDescription></DialogHeader>
               <div className="space-y-3">
                 <div className="space-y-2">
                   <Label>Paciente *</Label>
