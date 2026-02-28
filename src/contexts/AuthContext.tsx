@@ -53,53 +53,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    let mounted = true;
-    let initialLoadDone = false;
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        if (!mounted) return;
-
-        console.log("[Auth] onAuthStateChange:", _event, !!session);
-
+      (_event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          await fetchProfileAndRole(session.user.id);
+          setTimeout(() => fetchProfileAndRole(session.user.id), 0);
         } else {
           setProfile(null);
           setRole(null);
         }
-
-        initialLoadDone = true;
-        if (mounted) setLoading(false);
+        setLoading(false);
       }
     );
 
-    // Fallback: se INITIAL_SESSION nao disparar em 2s, usar getSession
-    const fallbackTimer = setTimeout(async () => {
-      if (!mounted || initialLoadDone) return;
-      console.log("[Auth] Fallback: using getSession");
-
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!mounted || initialLoadDone) return;
-
+    supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-
       if (session?.user) {
-        await fetchProfileAndRole(session.user.id);
+        fetchProfileAndRole(session.user.id);
       }
+      setLoading(false);
+    });
 
-      if (mounted) setLoading(false);
-    }, 2000);
-
-    return () => {
-      mounted = false;
-      clearTimeout(fallbackTimer);
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
   const signOut = async () => {
