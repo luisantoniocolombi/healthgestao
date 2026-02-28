@@ -1,4 +1,4 @@
-import { Users, CalendarDays, DollarSign, UserCog } from "lucide-react";
+import { Users, CalendarDays, DollarSign, UserCog, Wallet } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -19,6 +19,7 @@ const baseItems = [
 
 const adminItems = [
   { title: "Financeiro", url: "/financeiro", icon: DollarSign },
+  { title: "Fluxo de Caixa", url: "/fluxo-de-caixa", icon: Wallet },
   { title: "Profissionais", url: "/profissionais", icon: UserCog },
 ];
 

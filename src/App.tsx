@@ -13,6 +13,7 @@ import PatientForm from "./pages/PatientForm";
 import PatientDetail from "./pages/PatientDetail";
 import Appointments, { AppointmentForm } from "./pages/Appointments";
 import Financial from "./pages/Financial";
+import CashFlow from "./pages/CashFlow";
 import Professionals from "./pages/Professionals";
 import NotFound from "./pages/NotFound";
 
@@ -52,6 +53,7 @@ const App = () => (
               <Route path="/atendimentos/novo" element={<AppointmentForm />} />
               <Route path="/atendimentos/:id" element={<AppointmentForm />} />
               <Route path="/financeiro" element={<Financial />} />
+              <Route path="/fluxo-de-caixa" element={<CashFlow />} />
               <Route path="/profissionais" element={<Professionals />} />
             </Route>
             <Route path="*" element={<NotFound />} />
