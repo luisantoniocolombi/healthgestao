@@ -1,29 +1,26 @@
 
 
-# Adicionar campo "Gerar NFe" na edição do paciente
+# Adicionar campo "Email do Responsável" no cadastro e edição do paciente
 
-## Alterações no arquivo `src/pages/PatientDetail.tsx`
+## Alterações
 
-### 1. Importar Checkbox
-Adicionar import do `Checkbox` de `@/components/ui/checkbox`.
-
-### 2. Adicionar checkbox no formulário de edição
-Inserir campo "Gerar NFe" entre o campo Convênio (linha 340) e o campo Status (linha 341), com o mesmo padrão visual do cadastro:
-
-```tsx
-<div className="flex items-center space-x-2 sm:col-span-2">
-  <Checkbox
-    id="edit_gerar_nfe"
-    checked={!!form.gerar_nfe}
-    onCheckedChange={(checked) => setForm((prev) => ({ ...prev, gerar_nfe: !!checked }))}
-    disabled={!editing}
-  />
-  <Label htmlFor="edit_gerar_nfe">Gerar NFe</Label>
-</div>
+### 1. Migração de banco
+Adicionar coluna `responsavel_email` (text, nullable) na tabela `patients`:
+```sql
+ALTER TABLE public.patients ADD COLUMN responsavel_email text;
 ```
 
-### 3. Incluir `gerar_nfe` no handleSave
-Na linha 90, adicionar `gerar_nfe` na destructuring do form e incluir no objeto `updateData` (linha 91).
+### 2. `src/types/index.ts`
+Adicionar `responsavel_email?: string` à interface `Patient`.
+
+### 3. `src/pages/PatientForm.tsx`
+- Adicionar `responsavel_email: ""` ao estado inicial do form
+- Adicionar campo Input "Email do Responsável" logo após o campo "Responsável"
+- Incluir no objeto de inserção
+
+### 4. `src/pages/PatientDetail.tsx`
+- Adicionar campo Input "Email do Responsável" após o campo "Responsável" (linha 322)
+- Incluir `responsavel_email` na destructuring e no `updateData` do `handleSave` (linhas 91-92)
 
 Nenhuma outra alteração.
 
