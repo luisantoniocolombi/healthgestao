@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, Edit, Save, Plus, FileText, Trash2, Download } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -87,8 +88,8 @@ const PatientDetail = forwardRef<HTMLDivElement, object>(function PatientDetail(
 
   const handleSave = async () => {
     if (!id || !user) return;
-    const { nome_completo, telefone, responsavel_nome, endereco, doenca_principal, status, observacoes_gerais, convenio, user_id, cpf, data_nascimento } = form;
-    const updateData: any = { nome_completo, telefone, responsavel_nome, endereco, doenca_principal, status, observacoes_gerais, convenio, cpf: cpf || null, data_nascimento: data_nascimento || null, updated_by: user.id };
+    const { nome_completo, telefone, responsavel_nome, endereco, doenca_principal, status, observacoes_gerais, convenio, user_id, cpf, data_nascimento, gerar_nfe } = form;
+    const updateData: any = { nome_completo, telefone, responsavel_nome, endereco, doenca_principal, status, observacoes_gerais, convenio, cpf: cpf || null, data_nascimento: data_nascimento || null, gerar_nfe, updated_by: user.id };
     if (isAdmin && user_id) updateData.user_id = user_id;
     if (updateData.status === "inativo") {
       updateData.archived = true;
@@ -337,6 +338,15 @@ const PatientDetail = forwardRef<HTMLDivElement, object>(function PatientDetail(
                       <SelectItem value="outros">Outros</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+                <div className="flex items-center space-x-2 sm:col-span-2">
+                  <Checkbox
+                    id="edit_gerar_nfe"
+                    checked={!!form.gerar_nfe}
+                    onCheckedChange={(checked) => setForm((prev) => ({ ...prev, gerar_nfe: !!checked }))}
+                    disabled={!editing}
+                  />
+                  <Label htmlFor="edit_gerar_nfe">Gerar NFe</Label>
                 </div>
                 <div className="space-y-2">
                   <Label>Status</Label>
