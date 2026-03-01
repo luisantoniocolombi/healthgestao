@@ -159,6 +159,7 @@ const PatientForm = forwardRef<HTMLDivElement, object>(function PatientForm(_pro
                   <SelectContent>
                     <SelectItem value="particular">Particular</SelectItem>
                     <SelectItem value="unimed">Unimed</SelectItem>
+                    <SelectItem value="gap">GAP</SelectItem>
                     <SelectItem value="outros">Outros</SelectItem>
                   </SelectContent>
                 </Select>
