@@ -90,6 +90,11 @@ const PatientDetail = forwardRef<HTMLDivElement, object>(function PatientDetail(
     const { nome_completo, telefone, responsavel_nome, endereco, doenca_principal, status, observacoes_gerais, convenio, user_id, cpf, data_nascimento } = form;
     const updateData: any = { nome_completo, telefone, responsavel_nome, endereco, doenca_principal, status, observacoes_gerais, convenio, cpf: cpf || null, data_nascimento: data_nascimento || null, updated_by: user.id };
     if (isAdmin && user_id) updateData.user_id = user_id;
+    if (updateData.status === "inativo") {
+      updateData.archived = true;
+    } else if (updateData.status === "ativo") {
+      updateData.archived = false;
+    }
     const { error } = await supabase
       .from("patients")
       .update(updateData)
@@ -97,7 +102,11 @@ const PatientDetail = forwardRef<HTMLDivElement, object>(function PatientDetail(
     if (error) { toast.error("Erro ao salvar"); return; }
     toast.success("Paciente atualizado!");
     setEditing(false);
-    fetchAll();
+    if (updateData.status === "inativo") {
+      navigate("/pacientes");
+    } else {
+      fetchAll();
+    }
   };
 
   const handleArchive = async () => {
