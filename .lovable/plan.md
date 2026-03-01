@@ -1,20 +1,18 @@
 
 
-# Adicionar campo "Gerar NFe" no cadastro de paciente
+# Exibir badge "NFe" na listagem de pacientes
 
 ## Alteração
 
-### Arquivo: `src/pages/PatientForm.tsx`
+### Arquivo: `src/pages/Patients.tsx`
 
-1. Importar `Checkbox` de `@/components/ui/checkbox`
-2. Adicionar `gerar_nfe: false` ao estado inicial do form
-3. Adicionar campo checkbox "Gerar NFe" no formulário, após o campo de Convênio, com o mesmo padrão visual usado no formulário de atendimentos
+Adicionar um Badge "NFe" condicional na área de badges (linha 144-154), visível apenas quando `patient.gerar_nfe` for `true`. Será posicionado antes do badge de convênio e status.
 
-Nenhuma outra alteração. A tabela `patients` não possui coluna `gerar_nfe`, então será necessária uma migração para adicionar essa coluna.
-
-### Migração de banco
-
-```sql
-ALTER TABLE public.patients ADD COLUMN gerar_nfe boolean NOT NULL DEFAULT false;
+```tsx
+{patient.gerar_nfe && (
+  <Badge variant="outline" className="text-green-600 border-green-600">NFe</Badge>
+)}
 ```
+
+Nenhuma outra alteração necessária. O campo `gerar_nfe` já existe na tabela e no tipo `Patient`.
 
