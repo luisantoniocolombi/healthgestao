@@ -6,6 +6,7 @@ export interface Patient {
   telefone: string;
   endereco?: string;
   responsavel_nome?: string;
+  responsavel_email?: string;
   doenca_principal?: string;
   observacoes_gerais?: string;
   convenio?: string;

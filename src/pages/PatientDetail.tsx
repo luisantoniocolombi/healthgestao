@@ -88,8 +88,8 @@ const PatientDetail = forwardRef<HTMLDivElement, object>(function PatientDetail(
 
   const handleSave = async () => {
     if (!id || !user) return;
-    const { nome_completo, telefone, responsavel_nome, endereco, doenca_principal, status, observacoes_gerais, convenio, user_id, cpf, data_nascimento, gerar_nfe } = form;
-    const updateData: any = { nome_completo, telefone, responsavel_nome, endereco, doenca_principal, status, observacoes_gerais, convenio, cpf: cpf || null, data_nascimento: data_nascimento || null, gerar_nfe, updated_by: user.id };
+    const { nome_completo, telefone, responsavel_nome, responsavel_email, endereco, doenca_principal, status, observacoes_gerais, convenio, user_id, cpf, data_nascimento, gerar_nfe } = form;
+    const updateData: any = { nome_completo, telefone, responsavel_nome, responsavel_email, endereco, doenca_principal, status, observacoes_gerais, convenio, cpf: cpf || null, data_nascimento: data_nascimento || null, gerar_nfe, updated_by: user.id };
     if (isAdmin && user_id) updateData.user_id = user_id;
     if (updateData.status === "inativo") {
       updateData.archived = true;
@@ -319,6 +319,10 @@ const PatientDetail = forwardRef<HTMLDivElement, object>(function PatientDetail(
                 <div className="space-y-2">
                   <Label>Responsável</Label>
                   <Input value={form.responsavel_nome || ""} onChange={(e) => update("responsavel_nome", e.target.value)} disabled={!editing} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Email do Responsável</Label>
+                  <Input type="email" value={form.responsavel_email || ""} onChange={(e) => update("responsavel_email", e.target.value)} disabled={!editing} />
                 </div>
                 <div className="space-y-2 sm:col-span-2">
                   <Label>Endereço</Label>
