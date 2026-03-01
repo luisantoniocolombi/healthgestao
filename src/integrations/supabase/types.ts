@@ -343,6 +343,7 @@ export type Database = {
           nome_completo: string
           nome_lowercase: string | null
           observacoes_gerais: string | null
+          responsavel_email: string | null
           responsavel_nome: string | null
           status: string
           telefone: string
@@ -364,6 +365,7 @@ export type Database = {
           nome_completo: string
           nome_lowercase?: string | null
           observacoes_gerais?: string | null
+          responsavel_email?: string | null
           responsavel_nome?: string | null
           status?: string
           telefone: string
@@ -385,6 +387,7 @@ export type Database = {
           nome_completo?: string
           nome_lowercase?: string | null
           observacoes_gerais?: string | null
+          responsavel_email?: string | null
           responsavel_nome?: string | null
           status?: string
           telefone?: string

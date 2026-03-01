@@ -24,6 +24,7 @@ const PatientForm = forwardRef<HTMLDivElement, object>(function PatientForm(_pro
     telefone: "",
     endereco: "",
     responsavel_nome: "",
+    responsavel_email: "",
     doenca_principal: "",
     observacoes_gerais: "",
     convenio: "",
@@ -124,6 +125,15 @@ const PatientForm = forwardRef<HTMLDivElement, object>(function PatientForm(_pro
                   id="responsavel"
                   value={form.responsavel_nome}
                   onChange={(e) => update("responsavel_nome", e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="responsavel_email">Email do Responsável</Label>
+                <Input
+                  id="responsavel_email"
+                  type="email"
+                  value={form.responsavel_email}
+                  onChange={(e) => update("responsavel_email", e.target.value)}
                 />
               </div>
               <div className="space-y-2 sm:col-span-2">
