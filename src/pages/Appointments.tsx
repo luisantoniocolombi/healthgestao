@@ -378,7 +378,7 @@ export const AppointmentForm = forwardRef<HTMLDivElement, object>(function Appoi
     if (!user) return;
     setLoading(true);
 
-    const payload = {
+    const basePayload = {
       patient_id: form.patient_id,
       data_atendimento: form.data_atendimento,
       hora: form.hora || null,
@@ -387,18 +387,18 @@ export const AppointmentForm = forwardRef<HTMLDivElement, object>(function Appoi
       gerar_nfe: form.gerar_nfe,
       profissional_parceiro_id: form.profissional_parceiro_id || null,
       percentual_parceiro: form.profissional_parceiro_id ? parseFloat(form.percentual_parceiro) : null,
-      user_id: user.id,
       updated_by: user.id,
     };
 
     let appointmentId = id;
 
     if (id) {
-      const { error } = await supabase.from("appointments").update(payload).eq("id", id);
+      const { error } = await supabase.from("appointments").update(basePayload).eq("id", id);
       if (error) { toast.error("Erro ao salvar"); setLoading(false); return; }
     } else {
       const { data, error } = await supabase.from("appointments").insert({
-        ...payload,
+        ...basePayload,
+        user_id: user.id,
         created_by: user.id,
       }).select("id").single();
       if (error) { toast.error("Erro ao salvar"); setLoading(false); return; }
