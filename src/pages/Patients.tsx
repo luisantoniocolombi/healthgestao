@@ -142,6 +142,9 @@ const Patients = forwardRef<HTMLDivElement, object>(function Patients(_props, re
                   )}
                 </div>
                 <div className="flex gap-2 flex-wrap">
+                  {patient.gerar_nfe && (
+                    <Badge variant="outline" className="text-green-600 border-green-600">NFe</Badge>
+                  )}
                   {patient.archived && (
                     <Badge variant="outline" className="text-muted-foreground">Arquivado</Badge>
                   )}
