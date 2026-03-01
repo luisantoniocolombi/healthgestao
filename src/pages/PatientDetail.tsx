@@ -227,8 +227,34 @@ const PatientDetail = forwardRef<HTMLDivElement, object>(function PatientDetail(
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <h1 className="text-2xl font-bold text-foreground flex-1">{patient.nome_completo}</h1>
-        <Badge variant={patient.status === "ativo" ? "default" : "secondary"}>
-          {patient.status}
+        <Badge
+          variant={patient.status === "ativo" ? "default" : "secondary"}
+          className={`cursor-pointer group/badge transition-colors ${
+            patient.status === "ativo"
+              ? "hover:bg-destructive hover:text-destructive-foreground"
+              : "hover:bg-success hover:text-success-foreground"
+          }`}
+          onClick={async (e) => {
+            e.stopPropagation();
+            const newStatus = patient.status === "ativo" ? "inativo" : "ativo";
+            const archived = newStatus === "inativo";
+            const { error } = await supabase
+              .from("patients")
+              .update({ status: newStatus, archived, updated_by: user?.id } as any)
+              .eq("id", id);
+            if (error) { toast.error("Erro ao alterar status"); return; }
+            toast.success(archived ? "Paciente arquivado" : "Paciente reativado");
+            if (archived) {
+              navigate("/pacientes");
+            } else {
+              fetchAll();
+            }
+          }}
+        >
+          <span className="group-hover/badge:hidden">{patient.status}</span>
+          <span className="hidden group-hover/badge:inline-flex items-center gap-1">
+            {patient.status === "ativo" ? "inativo" : "ativo"}
+          </span>
         </Badge>
       </div>
 
