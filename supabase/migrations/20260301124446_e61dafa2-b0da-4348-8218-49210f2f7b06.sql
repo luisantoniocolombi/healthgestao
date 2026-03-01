@@ -1,0 +1,1 @@
+ALTER TABLE public.patients ADD COLUMN gerar_nfe boolean NOT NULL DEFAULT false;

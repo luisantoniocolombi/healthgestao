@@ -338,6 +338,7 @@ export type Database = {
           data_nascimento: string | null
           doenca_principal: string | null
           endereco: string | null
+          gerar_nfe: boolean
           id: string
           nome_completo: string
           nome_lowercase: string | null
@@ -358,6 +359,7 @@ export type Database = {
           data_nascimento?: string | null
           doenca_principal?: string | null
           endereco?: string | null
+          gerar_nfe?: boolean
           id?: string
           nome_completo: string
           nome_lowercase?: string | null
@@ -378,6 +380,7 @@ export type Database = {
           data_nascimento?: string | null
           doenca_principal?: string | null
           endereco?: string | null
+          gerar_nfe?: boolean
           id?: string
           nome_completo?: string
           nome_lowercase?: string | null

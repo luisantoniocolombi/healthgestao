@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 
@@ -29,6 +30,7 @@ const PatientForm = forwardRef<HTMLDivElement, object>(function PatientForm(_pro
     cpf: "",
     data_nascimento: "",
     status: "ativo",
+    gerar_nfe: false as boolean,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -150,6 +152,14 @@ const PatientForm = forwardRef<HTMLDivElement, object>(function PatientForm(_pro
                     <SelectItem value="outros">Outros</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="flex items-center space-x-2 sm:col-span-2">
+                <Checkbox
+                  id="gerar_nfe"
+                  checked={form.gerar_nfe}
+                  onCheckedChange={(checked) => setForm((prev) => ({ ...prev, gerar_nfe: !!checked }))}
+                />
+                <Label htmlFor="gerar_nfe">Gerar NFe</Label>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>

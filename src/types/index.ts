@@ -12,6 +12,7 @@ export interface Patient {
   cpf?: string;
   data_nascimento?: string;
   status: 'ativo' | 'inativo';
+  gerar_nfe: boolean;
   archived: boolean;
   created_at: string;
   updated_at: string;
