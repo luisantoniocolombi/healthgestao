@@ -24,20 +24,24 @@ const Patients = forwardRef<HTMLDivElement, object>(function Patients(_props, re
   const fetchPatients = async () => {
     if (!user) return;
     try {
-      const isArchived = statusFilter === "arquivados";
-
       let query = supabase
         .from("patients")
         .select("*")
-        .eq("archived", isArchived)
         .order("nome_completo");
 
       if (!isAdmin) {
         query = query.eq("user_id", user.id);
       }
 
-      if (!isArchived && statusFilter !== "todos") {
-        query = query.eq("status", statusFilter);
+      if (statusFilter === "inativo") {
+        query = query.eq("status", "inativo");
+      } else if (statusFilter === "arquivados") {
+        query = query.eq("archived", true);
+      } else {
+        query = query.eq("archived", false);
+        if (statusFilter !== "todos") {
+          query = query.eq("status", statusFilter);
+        }
       }
 
       const { data, error } = await query;
