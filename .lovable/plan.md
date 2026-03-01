@@ -1,44 +1,37 @@
 
 
-# Correcao: Tela branca no painel do profissional
+# Correção: Sistema travado em "Carregando..."
 
 ## Causa raiz
 
-O problema esta no `AuthContext`. O `loading` e definido como `false` ANTES de `fetchProfileAndRole` completar. Isso cria uma janela onde `profile` e `role` sao `null`, mas os componentes ja renderizam. Para profissionais, isso pode causar a tela branca durante navegacao porque:
+O `onAuthStateChange` do Supabase não deve conter chamadas `await` para o próprio Supabase dentro do callback — isso causa um deadlock. A documentação do Supabase alerta que o callback deve ser rápido/síncrono. O código anterior usava `setTimeout` justamente para evitar isso, mas a última alteração trocou por `await`, travando o sistema.
 
-1. `onAuthStateChange` usa `setTimeout` para `fetchProfileAndRole` mas chama `setLoading(false)` imediatamente
-2. `getSession().then()` nao faz `await` em `fetchProfileAndRole` antes de `setLoading(false)`
-3. Durante navegacao client-side, os componentes montam com `profile = null` e `role = null`
-
-Na atualizacao da pagina (refresh), o timing e diferente e os dados carregam a tempo.
-
-## Correcao
+## Correção
 
 ### Arquivo: `src/contexts/AuthContext.tsx`
 
-1. No `getSession().then()`: usar `await fetchProfileAndRole()` antes de `setLoading(false)`
-2. No `onAuthStateChange`: nao definir `loading = false` no evento `INITIAL_SESSION` (deixar o `getSession` controlar o loading inicial). Para eventos subsequentes (`SIGNED_IN`, `TOKEN_REFRESHED`, `SIGNED_OUT`), aguardar `fetchProfileAndRole` antes de definir loading.
-3. Adicionar guard para evitar double-fetch com um ref
+Manter `setTimeout` no `onAuthStateChange` para evitar deadlock, mas controlar o `loading` corretamente usando um flag para saber quando a inicialização terminou:
 
-Codigo simplificado da mudanca:
 ```tsx
 useEffect(() => {
   let initialDone = false;
 
   const { data: { subscription } } = supabase.auth.onAuthStateChange(
-    async (_event, session) => {
+    (_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
 
       if (session?.user) {
-        await fetchProfileAndRole(session.user.id);
+        // setTimeout evita deadlock com Supabase
+        setTimeout(() => {
+          fetchProfileAndRole(session.user.id).then(() => {
+            if (initialDone) setLoading(false);
+          });
+        }, 0);
       } else {
         setProfile(null);
         setRole(null);
-      }
-
-      if (initialDone) {
-        setLoading(false);
+        if (initialDone) setLoading(false);
       }
     }
   );
@@ -57,5 +50,10 @@ useEffect(() => {
 }, []);
 ```
 
-Nenhuma outra alteracao. Apenas o `AuthContext`.
+Diferenças chave:
+- `onAuthStateChange`: usa `setTimeout` + `.then()` (sem `await` direto) para evitar deadlock
+- `getSession`: mantém `await` para garantir que profile/role carregam antes do loading inicial
+- `initialDone` controla qual path define o loading
+
+Nenhuma outra alteração.
 
