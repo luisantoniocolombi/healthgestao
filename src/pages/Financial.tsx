@@ -13,7 +13,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableHeader, TableBody, TableFooter, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, Plus, Search, Check, X, Edit } from "lucide-react";
+import { DollarSign, Plus, Search, Check, X, Edit, ChevronDown } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { cn } from "@/lib/utils";
 import { Appointment } from "@/types";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth } from "date-fns";
@@ -33,6 +35,7 @@ const Financial = forwardRef<HTMLDivElement, object>(function Financial(_props, 
   const [currentMonth, setCurrentMonth] = useState(format(new Date(), "yyyy-MM"));
 
   // New receivable dialog
+  const [summaryOpen, setSummaryOpen] = useState(false);
   const [newDialog, setNewDialog] = useState(false);
   const [newForm, setNewForm] = useState({
     patient_id: "",
@@ -260,39 +263,47 @@ const Financial = forwardRef<HTMLDivElement, object>(function Financial(_props, 
         if (summaryRows.length === 0) return null;
 
         return (
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg">Resumo por Paciente</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Paciente</TableHead>
-                    <TableHead className="text-center">Atendimentos</TableHead>
-                    <TableHead>Dias</TableHead>
-                    <TableHead className="text-right">Total a Receber</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {summaryRows.map((row, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="font-medium">{row.nome}</TableCell>
-                      <TableCell className="text-center">{row.atendimentos}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{row.dias.sort().join(", ")}</TableCell>
-                      <TableCell className="text-right font-semibold">R$ {row.totalReceber.toFixed(2)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-                <TableFooter>
-                  <TableRow>
-                    <TableCell colSpan={3} className="font-semibold">Total Geral</TableCell>
-                    <TableCell className="text-right font-bold">R$ {grandTotal.toFixed(2)}</TableCell>
-                  </TableRow>
-                </TableFooter>
-              </Table>
-            </CardContent>
-          </Card>
+          <Collapsible open={summaryOpen} onOpenChange={setSummaryOpen}>
+            <Card>
+              <CollapsibleTrigger asChild>
+                <CardHeader className="pb-3 cursor-pointer flex flex-row items-center justify-between">
+                  <CardTitle className="text-lg">Resumo por Paciente</CardTitle>
+                  <ChevronDown className={cn("h-4 w-4 transition-transform text-muted-foreground", summaryOpen && "rotate-180")} />
+                </CardHeader>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent className="pt-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="p-2 sm:p-4 text-xs sm:text-sm">Paciente</TableHead>
+                        <TableHead className="p-2 sm:p-4 text-xs sm:text-sm text-center"><span className="hidden sm:inline">Atendimentos</span><span className="sm:hidden">Atend.</span></TableHead>
+                        <TableHead className="hidden sm:table-cell p-2 sm:p-4 text-xs sm:text-sm">Dias</TableHead>
+                        <TableHead className="p-2 sm:p-4 text-xs sm:text-sm text-right whitespace-nowrap">Total a Receber</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {summaryRows.map((row, i) => (
+                        <TableRow key={i}>
+                          <TableCell className="p-2 sm:p-4 text-xs sm:text-sm font-medium">{row.nome}</TableCell>
+                          <TableCell className="p-2 sm:p-4 text-xs sm:text-sm text-center">{row.atendimentos}</TableCell>
+                          <TableCell className="hidden sm:table-cell p-2 sm:p-4 text-xs sm:text-sm text-muted-foreground">{row.dias.sort().join(", ")}</TableCell>
+                          <TableCell className="p-2 sm:p-4 text-xs sm:text-sm text-right font-semibold whitespace-nowrap">R$ {row.totalReceber.toFixed(2)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                    <TableFooter>
+                      <TableRow>
+                        <TableCell colSpan={2} className="p-2 sm:p-4 text-xs sm:text-sm font-semibold"><span className="sm:hidden">Total</span><span className="hidden sm:inline">Total Geral</span></TableCell>
+                        <TableCell className="hidden sm:table-cell" />
+                        <TableCell className="p-2 sm:p-4 text-xs sm:text-sm text-right font-bold whitespace-nowrap">R$ {grandTotal.toFixed(2)}</TableCell>
+                      </TableRow>
+                    </TableFooter>
+                  </Table>
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
         );
       })()}
 
