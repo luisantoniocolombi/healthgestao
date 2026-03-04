@@ -1,40 +1,16 @@
 
 
-# Resumo por Paciente: Collapsible + Layout Mobile
+# Mostrar todas as 4 colunas no mobile
 
-## Alterações no arquivo `src/pages/Financial.tsx`
+## Alteração: `src/pages/Financial.tsx`
 
-### 1. Tornar a seção colapsável (fechada por padrão)
+Remover `hidden sm:table-cell` da coluna "Dias" nas linhas 281, 290 e 298, mantendo-a sempre visível. Ajustar o `colSpan` do footer para 3 (já que agora são 4 colunas visíveis). Manter os tamanhos de fonte e padding responsivos (`p-2 sm:p-4`, `text-xs sm:text-sm`) para que tudo caiba no mobile.
 
-Usar o componente `Collapsible` do Radix (já instalado) para envolver o "Resumo por Paciente". O CardHeader terá um botão de toggle com ícone chevron. Estado inicial: `open = false`.
+Linhas afetadas:
+- **281**: `hidden sm:table-cell` → visível sempre
+- **290**: `hidden sm:table-cell` → visível sempre  
+- **297**: Footer `colSpan={2}` → `colSpan={3}`
+- **298**: Remover a célula vazia separada (`hidden sm:table-cell`)
 
-```tsx
-const [summaryOpen, setSummaryOpen] = useState(false);
-
-<Collapsible open={summaryOpen} onOpenChange={setSummaryOpen}>
-  <Card>
-    <CollapsibleTrigger asChild>
-      <CardHeader className="pb-3 cursor-pointer flex-row items-center justify-between">
-        <CardTitle className="text-lg">Resumo por Paciente</CardTitle>
-        <ChevronDown className={cn("h-4 w-4 transition-transform", summaryOpen && "rotate-180")} />
-      </CardHeader>
-    </CollapsibleTrigger>
-    <CollapsibleContent>
-      <CardContent>...</CardContent>
-    </CollapsibleContent>
-  </Card>
-</Collapsible>
-```
-
-### 2. Ajustar colunas para mobile
-
-- Ocultar a coluna "Dias" em telas pequenas (`hidden sm:table-cell`)
-- Reduzir padding das cells (`p-2 sm:p-4`)
-- Usar `text-xs sm:text-sm` nos textos
-- Coluna "Atend." com texto abreviado no mobile
-- Valores com `whitespace-nowrap` para não quebrar linha
-
-Imports adicionais: `Collapsible, CollapsibleContent, CollapsibleTrigger` de `@/components/ui/collapsible`, `ChevronDown` de `lucide-react`.
-
-Nenhuma alteração de banco de dados.
+Sem alterações de banco de dados.
 
