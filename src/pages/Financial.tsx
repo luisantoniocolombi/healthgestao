@@ -278,7 +278,7 @@ const Financial = forwardRef<HTMLDivElement, object>(function Financial(_props, 
                       <TableRow>
                         <TableHead className="p-2 sm:p-4 text-xs sm:text-sm">Paciente</TableHead>
                         <TableHead className="p-2 sm:p-4 text-xs sm:text-sm text-center"><span className="hidden sm:inline">Atendimentos</span><span className="sm:hidden">Atend.</span></TableHead>
-                        <TableHead className="hidden sm:table-cell p-2 sm:p-4 text-xs sm:text-sm">Dias</TableHead>
+                        <TableHead className="p-2 sm:p-4 text-xs sm:text-sm">Dias</TableHead>
                         <TableHead className="p-2 sm:p-4 text-xs sm:text-sm text-right whitespace-nowrap">Total a Receber</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -287,15 +287,14 @@ const Financial = forwardRef<HTMLDivElement, object>(function Financial(_props, 
                         <TableRow key={i}>
                           <TableCell className="p-2 sm:p-4 text-xs sm:text-sm font-medium">{row.nome}</TableCell>
                           <TableCell className="p-2 sm:p-4 text-xs sm:text-sm text-center">{row.atendimentos}</TableCell>
-                          <TableCell className="hidden sm:table-cell p-2 sm:p-4 text-xs sm:text-sm text-muted-foreground">{row.dias.sort().join(", ")}</TableCell>
+                          <TableCell className="p-2 sm:p-4 text-xs sm:text-sm text-muted-foreground">{row.dias.sort().join(", ")}</TableCell>
                           <TableCell className="p-2 sm:p-4 text-xs sm:text-sm text-right font-semibold whitespace-nowrap">R$ {row.totalReceber.toFixed(2)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                     <TableFooter>
                       <TableRow>
-                        <TableCell colSpan={2} className="p-2 sm:p-4 text-xs sm:text-sm font-semibold"><span className="sm:hidden">Total</span><span className="hidden sm:inline">Total Geral</span></TableCell>
-                        <TableCell className="hidden sm:table-cell" />
+                        <TableCell colSpan={3} className="p-2 sm:p-4 text-xs sm:text-sm font-semibold">Total Geral</TableCell>
                         <TableCell className="p-2 sm:p-4 text-xs sm:text-sm text-right font-bold whitespace-nowrap">R$ {grandTotal.toFixed(2)}</TableCell>
                       </TableRow>
                     </TableFooter>
