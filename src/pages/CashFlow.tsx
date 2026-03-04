@@ -8,12 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Table, TableHeader, TableBody, TableFooter, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowDownCircle, ArrowUpCircle, DollarSign, Plus, Check, X, Edit, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
+import { format, startOfMonth, endOfMonth, parseISO, addMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 interface Expense {
@@ -31,6 +31,8 @@ interface Expense {
   archived: boolean;
   created_at: string;
   updated_at: string;
+  recorrencia_tipo?: string | null;
+  parcela_info?: string | null;
 }
 
 interface CashFlowEntry {
@@ -56,7 +58,6 @@ const CashFlow = forwardRef<HTMLDivElement, object>(function CashFlow(_props, re
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [dialogMode, setDialogMode] = useState<"despesa" | "receita">("despesa");
 
-  // Form state
   const [form, setForm] = useState({
     descricao: "",
     categoria: "Variável",
@@ -64,6 +65,9 @@ const CashFlow = forwardRef<HTMLDivElement, object>(function CashFlow(_props, re
     data_vencimento: format(new Date(), "yyyy-MM-dd"),
     forma_pagamento: "",
     observacao: "",
+    recorrencia: "nenhuma" as "nenhuma" | "recorrente" | "parcelada",
+    num_parcelas: "",
+    num_meses_recorrente: "",
   });
 
   const monthDate = useMemo(() => parseISO(month + "-01"), [month]);
@@ -138,7 +142,7 @@ const CashFlow = forwardRef<HTMLDivElement, object>(function CashFlow(_props, re
   const saldo = totalEntradas - totalSaidas;
 
   const resetForm = () => {
-    setForm({ descricao: "", categoria: "Variável", valor: "", data_vencimento: format(new Date(), "yyyy-MM-dd"), forma_pagamento: "", observacao: "" });
+    setForm({ descricao: "", categoria: "Variável", valor: "", data_vencimento: format(new Date(), "yyyy-MM-dd"), forma_pagamento: "", observacao: "", recorrencia: "nenhuma", num_parcelas: "", num_meses_recorrente: "" });
     setEditingExpense(null);
   };
 
@@ -158,6 +162,9 @@ const CashFlow = forwardRef<HTMLDivElement, object>(function CashFlow(_props, re
       data_vencimento: expense.data_vencimento,
       forma_pagamento: expense.forma_pagamento || "",
       observacao: expense.observacao || "",
+      recorrencia: "nenhuma",
+      num_parcelas: "",
+      num_meses_recorrente: "",
     });
     setDialogOpen(true);
   };
@@ -180,10 +187,11 @@ const CashFlow = forwardRef<HTMLDivElement, object>(function CashFlow(_props, re
           observacao: form.observacao || null,
         } as any)
         .eq("id", editingExpense.id);
-      if (error) { toast.error("Erro ao atualizar despesa"); return; }
-      toast.success("Despesa atualizada");
+      if (error) { toast.error("Erro ao atualizar"); return; }
+      toast.success(dialogMode === "receita" ? "Receita atualizada" : "Despesa atualizada");
     } else {
-      const { error } = await supabase.from("expenses" as any).insert({
+      // New entry — handle recurrence
+      const baseRecord = {
         user_id: user!.id,
         conta_principal_id: contaPrincipalId,
         descricao: form.descricao,
@@ -193,9 +201,45 @@ const CashFlow = forwardRef<HTMLDivElement, object>(function CashFlow(_props, re
         forma_pagamento: form.forma_pagamento || null,
         observacao: form.observacao || null,
         tipo: dialogMode,
-      } as any);
-      if (error) { toast.error("Erro ao criar despesa"); return; }
-      toast.success("Despesa criada");
+      };
+
+      if (form.recorrencia === "recorrente") {
+        const numMeses = Math.min(Math.max(parseInt(form.num_meses_recorrente) || 2, 2), 24);
+        const records = [];
+        for (let i = 0; i < numMeses; i++) {
+          const dueDate = addMonths(parseISO(form.data_vencimento), i);
+          records.push({
+            ...baseRecord,
+            data_vencimento: format(dueDate, "yyyy-MM-dd"),
+            recorrencia_tipo: "recorrente",
+          });
+        }
+        const { error } = await supabase.from("expenses" as any).insert(records as any);
+        if (error) { toast.error("Erro ao criar lançamentos recorrentes"); return; }
+        toast.success(`${numMeses} lançamentos recorrentes criados`);
+      } else if (form.recorrencia === "parcelada") {
+        const numParcelas = Math.min(Math.max(parseInt(form.num_parcelas) || 2, 2), 48);
+        const valorParcela = Math.round((parseFloat(form.valor) / numParcelas) * 100) / 100;
+        const records = [];
+        for (let i = 0; i < numParcelas; i++) {
+          const dueDate = addMonths(parseISO(form.data_vencimento), i);
+          records.push({
+            ...baseRecord,
+            descricao: `${form.descricao} (${i + 1}/${numParcelas})`,
+            valor: valorParcela,
+            data_vencimento: format(dueDate, "yyyy-MM-dd"),
+            recorrencia_tipo: "parcelada",
+            parcela_info: `${i + 1}/${numParcelas}`,
+          });
+        }
+        const { error } = await supabase.from("expenses" as any).insert(records as any);
+        if (error) { toast.error("Erro ao criar parcelas"); return; }
+        toast.success(`${numParcelas} parcelas criadas (${formatCurrency(valorParcela)} cada)`);
+      } else {
+        const { error } = await supabase.from("expenses" as any).insert(baseRecord as any);
+        if (error) { toast.error("Erro ao criar lançamento"); return; }
+        toast.success(dialogMode === "receita" ? "Receita criada" : "Despesa criada");
+      }
     }
 
     setDialogOpen(false);
@@ -209,7 +253,7 @@ const CashFlow = forwardRef<HTMLDivElement, object>(function CashFlow(_props, re
       .update({ status: "pago", data_pagamento: format(new Date(), "yyyy-MM-dd") } as any)
       .eq("id", expense.id);
     if (error) { toast.error("Erro ao marcar como pago"); return; }
-    toast.success("Despesa marcada como paga");
+    toast.success("Marcado como pago");
     fetchData();
   };
 
@@ -219,7 +263,7 @@ const CashFlow = forwardRef<HTMLDivElement, object>(function CashFlow(_props, re
       .update({ status: "cancelado" } as any)
       .eq("id", expense.id);
     if (error) { toast.error("Erro ao cancelar"); return; }
-    toast.success("Despesa cancelada");
+    toast.success("Cancelado");
     fetchData();
   };
 
@@ -229,7 +273,7 @@ const CashFlow = forwardRef<HTMLDivElement, object>(function CashFlow(_props, re
       .update({ archived: true } as any)
       .eq("id", expense.id);
     if (error) { toast.error("Erro ao excluir"); return; }
-    toast.success("Despesa excluída");
+    toast.success("Excluído");
     fetchData();
   };
 
@@ -333,45 +377,53 @@ const CashFlow = forwardRef<HTMLDivElement, object>(function CashFlow(_props, re
               ) : entries.length === 0 ? (
                 <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Nenhum registro no período</TableCell></TableRow>
               ) : (
-                entries.map((entry) => (
-                  <TableRow key={`${entry.tipo}-${entry.id}`}>
-                    <TableCell>{format(parseISO(entry.data), "dd/MM/yyyy")}</TableCell>
-                    <TableCell>{entry.descricao}</TableCell>
-                    <TableCell>
-                      <Badge variant={entry.tipo === "entrada" ? "default" : "destructive"}>
-                        {entry.tipo === "entrada" ? "Entrada" : "Saída"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className={entry.tipo === "entrada" ? "text-emerald-600 font-medium" : "text-destructive font-medium"}>
-                      {entry.tipo === "entrada" ? "+" : "-"}{formatCurrency(entry.valor)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={entry.status === "pago" ? "default" : entry.status === "cancelado" ? "secondary" : "outline"}>
-                        {entry.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {(entry.original as any).tipo && (entry.original as Expense).status === "pendente" && (
-                        <div className="flex justify-end gap-1">
-                          <Button size="icon" variant="ghost" title="Marcar como pago" onClick={() => handleMarkPaid(entry.original as Expense)}>
-                            <Check className="h-4 w-4 text-emerald-500" />
+                entries.map((entry) => {
+                  const exp = entry.original as Expense;
+                  return (
+                    <TableRow key={`${entry.tipo}-${entry.id}`}>
+                      <TableCell>{format(parseISO(entry.data), "dd/MM/yyyy")}</TableCell>
+                      <TableCell>
+                        <span>{entry.descricao}</span>
+                        {exp.recorrencia_tipo === "recorrente" && (
+                          <Badge variant="outline" className="ml-2 text-xs">Recorrente</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={entry.tipo === "entrada" ? "default" : "destructive"}>
+                          {entry.tipo === "entrada" ? "Entrada" : "Saída"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className={entry.tipo === "entrada" ? "text-emerald-600 font-medium" : "text-destructive font-medium"}>
+                        {entry.tipo === "entrada" ? "+" : "-"}{formatCurrency(entry.valor)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={entry.status === "pago" ? "default" : entry.status === "cancelado" ? "secondary" : "outline"}>
+                          {entry.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {(entry.original as any).tipo && exp.status === "pendente" && (
+                          <div className="flex justify-end gap-1">
+                            <Button size="icon" variant="ghost" title="Marcar como pago" onClick={() => handleMarkPaid(exp)}>
+                              <Check className="h-4 w-4 text-emerald-500" />
+                            </Button>
+                            <Button size="icon" variant="ghost" title="Editar" onClick={() => handleEdit(exp)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button size="icon" variant="ghost" title="Cancelar" onClick={() => handleCancel(exp)}>
+                              <X className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        )}
+                        {(entry.original as any).tipo && exp.status !== "pendente" && (
+                          <Button size="icon" variant="ghost" title="Excluir" onClick={() => handleArchive(exp)}>
+                            <Trash2 className="h-4 w-4 text-muted-foreground" />
                           </Button>
-                          <Button size="icon" variant="ghost" title="Editar" onClick={() => handleEdit(entry.original as Expense)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button size="icon" variant="ghost" title="Cancelar" onClick={() => handleCancel(entry.original as Expense)}>
-                            <X className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      )}
-                      {(entry.original as any).tipo && (entry.original as Expense).status !== "pendente" && (
-                        <Button size="icon" variant="ghost" title="Excluir" onClick={() => handleArchive(entry.original as Expense)}>
-                          <Trash2 className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
             {entries.length > 0 && (
@@ -388,7 +440,7 @@ const CashFlow = forwardRef<HTMLDivElement, object>(function CashFlow(_props, re
         </CardContent>
       </Card>
 
-      {/* Dialog Nova/Editar Despesa */}
+      {/* Dialog Nova/Editar */}
       <Dialog open={dialogOpen} onOpenChange={(o) => { if (!o) resetForm(); setDialogOpen(o); }}>
         <DialogContent>
           <DialogHeader>
@@ -425,6 +477,36 @@ const CashFlow = forwardRef<HTMLDivElement, object>(function CashFlow(_props, re
                 <Input value={form.forma_pagamento} onChange={(e) => setForm({ ...form, forma_pagamento: e.target.value })} placeholder="Pix, Boleto..." />
               </div>
             </div>
+
+            {/* Recurrence fields — only on creation */}
+            {!editingExpense && (
+              <>
+                <div>
+                  <Label>Tipo de Lançamento</Label>
+                  <Select value={form.recorrencia} onValueChange={(v: "nenhuma" | "recorrente" | "parcelada") => setForm({ ...form, recorrencia: v, num_parcelas: "", num_meses_recorrente: "" })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="nenhuma">Único</SelectItem>
+                      <SelectItem value="recorrente">Recorrente</SelectItem>
+                      <SelectItem value="parcelada">Parcelado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {form.recorrencia === "recorrente" && (
+                  <div>
+                    <Label>Quantidade de meses (2 a 24)</Label>
+                    <Input type="number" min={2} max={24} value={form.num_meses_recorrente} onChange={(e) => setForm({ ...form, num_meses_recorrente: e.target.value })} placeholder="Ex: 12" />
+                  </div>
+                )}
+                {form.recorrencia === "parcelada" && (
+                  <div>
+                    <Label>Número de parcelas (2 a 48)</Label>
+                    <Input type="number" min={2} max={48} value={form.num_parcelas} onChange={(e) => setForm({ ...form, num_parcelas: e.target.value })} placeholder="Ex: 5" />
+                  </div>
+                )}
+              </>
+            )}
+
             <div>
               <Label>Observação</Label>
               <Textarea value={form.observacao} onChange={(e) => setForm({ ...form, observacao: e.target.value })} />
