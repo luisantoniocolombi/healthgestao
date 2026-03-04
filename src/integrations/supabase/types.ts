@@ -197,6 +197,8 @@ export type Database = {
           forma_pagamento: string | null
           id: string
           observacao: string | null
+          parcela_info: string | null
+          recorrencia_tipo: string | null
           status: string
           tipo: string
           updated_at: string
@@ -214,6 +216,8 @@ export type Database = {
           forma_pagamento?: string | null
           id?: string
           observacao?: string | null
+          parcela_info?: string | null
+          recorrencia_tipo?: string | null
           status?: string
           tipo?: string
           updated_at?: string
@@ -231,6 +235,8 @@ export type Database = {
           forma_pagamento?: string | null
           id?: string
           observacao?: string | null
+          parcela_info?: string | null
+          recorrencia_tipo?: string | null
           status?: string
           tipo?: string
           updated_at?: string
