@@ -33,6 +33,8 @@ const Financial = forwardRef<HTMLDivElement, object>(function Financial(_props, 
   const [nfeFilter, setNfeFilter] = useState("todos");
   const [search, setSearch] = useState("");
   const [currentMonth, setCurrentMonth] = useState(format(new Date(), "yyyy-MM"));
+  const [periodType, setPeriodType] = useState<"mensal" | "semanal">("mensal");
+  const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
 
   // New receivable dialog
   const [summaryOpen, setSummaryOpen] = useState(false);
