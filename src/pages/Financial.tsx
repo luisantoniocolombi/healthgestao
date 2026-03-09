@@ -86,7 +86,7 @@ const Financial = forwardRef<HTMLDivElement, object>(function Financial(_props, 
     setLoading(false);
   };
 
-  useEffect(() => { fetchData(); }, [user, currentMonth, isAdmin]);
+  useEffect(() => { fetchData(); }, [user, currentMonth, currentWeekStart, periodType, isAdmin]);
 
   const filtered = receivables.filter(r => {
     if (statusFilter !== "todos" && r.status_pagamento !== statusFilter) return false;
