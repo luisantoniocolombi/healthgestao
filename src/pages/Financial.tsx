@@ -13,12 +13,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableHeader, TableBody, TableFooter, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, Plus, Search, Check, X, Edit, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { DollarSign, Plus, Search, Check, X, Edit, ChevronDown, ChevronLeft, ChevronRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { Appointment } from "@/types";
 import { toast } from "sonner";
-import { format, startOfMonth, endOfMonth } from "date-fns";
+import { forma, startOfWeek, endOfWeek, addWeeks, subWeekst, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 const Financial = forwardRef<HTMLDivElement, object>(function Financial(_props, ref) {
