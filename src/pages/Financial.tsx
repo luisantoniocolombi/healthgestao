@@ -49,9 +49,15 @@ const Financial = forwardRef<HTMLDivElement, object>(function Financial(_props, 
 
   const fetchData = async () => {
     if (!user) return;
-    const [year, month] = currentMonth.split("-").map(Number);
-    const start = format(new Date(year, month - 1, 1), "yyyy-MM-dd");
-    const end = format(endOfMonth(new Date(year, month - 1, 1)), "yyyy-MM-dd");
+    let start: string, end: string;
+    if (periodType === "semanal") {
+      start = format(currentWeekStart, "yyyy-MM-dd");
+      end = format(endOfWeek(currentWeekStart, { weekStartsOn: 1 }), "yyyy-MM-dd");
+    } else {
+      const [year, month] = currentMonth.split("-").map(Number);
+      start = format(new Date(year, month - 1, 1), "yyyy-MM-dd");
+      end = format(endOfMonth(new Date(year, month - 1, 1)), "yyyy-MM-dd");
+    }
 
     const recQuery = supabase.from("receivables").select("*, patients(nome_completo)")
         .eq("archived", false)
