@@ -1,30 +1,16 @@
 
 
-# Filtro Semanal na aba Financeiro
-
-## Resumo
-
-Adicionar um seletor de período (Mensal / Semanal) ao lado do filtro de mês existente. Quando "Semanal" estiver selecionado, o input de mês será substituído por uma navegação de semana (com botões anterior/próxima e exibição do intervalo de datas). Os dados serão filtrados pelo intervalo da semana selecionada.
+# Mostrar todas as 4 colunas no mobile
 
 ## Alteração: `src/pages/Financial.tsx`
 
-### Novo estado
-- `periodType`: `"mensal" | "semanal"` (default `"mensal"`)
-- `currentWeekStart`: `Date` — início da semana atual (segunda-feira)
+Remover `hidden sm:table-cell` da coluna "Dias" nas linhas 281, 290 e 298, mantendo-a sempre visível. Ajustar o `colSpan` do footer para 3 (já que agora são 4 colunas visíveis). Manter os tamanhos de fonte e padding responsivos (`p-2 sm:p-4`, `text-xs sm:text-sm`) para que tudo caiba no mobile.
 
-### Lógica de datas
-- Importar `startOfWeek`, `endOfWeek`, `addWeeks`, `subWeeks` de `date-fns`
-- Quando `periodType === "semanal"`, calcular `start` e `end` a partir de `currentWeekStart` (segunda a domingo, locale ptBR)
-- Quando `periodType === "mensal"`, manter o comportamento atual com `currentMonth`
-- O `fetchData` usará as datas corretas conforme o tipo de período
+Linhas afetadas:
+- **281**: `hidden sm:table-cell` → visível sempre
+- **290**: `hidden sm:table-cell` → visível sempre  
+- **297**: Footer `colSpan={2}` → `colSpan={3}`
+- **298**: Remover a célula vazia separada (`hidden sm:table-cell`)
 
-### UI dos filtros (linha 216-238)
-- Adicionar um `Select` de período antes do input de data:
-  - Opções: "Mensal" e "Semanal"
-- Quando mensal: mostrar o `input type="month"` atual
-- Quando semanal: mostrar botões `←` e `→` para navegar semanas + label com o intervalo (ex: "03/03 - 09/03/2026")
-
-### Sem alterações no banco de dados
-
-Os cards de resumo e a tabela continuarão funcionando normalmente — apenas o intervalo de datas da query muda.
+Sem alterações de banco de dados.
 
