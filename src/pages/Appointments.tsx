@@ -201,11 +201,25 @@ const Appointments = forwardRef<HTMLDivElement, object>(function Appointments(_p
 
       {/* Calendar nav */}
       <div className="flex items-center justify-between">
-        <Button variant="outline" size="sm" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>←</Button>
+        <Button variant="outline" size="sm" onClick={() => {
+          if (calendarView === "semanal") setSelectedDate(subWeeks(selectedDate, 1));
+          else if (calendarView === "quinzenal") setSelectedDate(subWeeks(selectedDate, 2));
+          else setCurrentMonth(subMonths(currentMonth, 1));
+        }}>←</Button>
         <h2 className="text-lg font-semibold capitalize">
-          {format(currentMonth, "MMMM yyyy", { locale: ptBR })}
+          {calendarView === "mensal"
+            ? format(currentMonth, "MMMM yyyy", { locale: ptBR })
+            : (() => {
+                const range = getDateRange();
+                return `${format(range.start, "dd/MM")} - ${format(range.end, "dd/MM/yyyy")}`;
+              })()
+          }
         </h2>
-        <Button variant="outline" size="sm" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>→</Button>
+        <Button variant="outline" size="sm" onClick={() => {
+          if (calendarView === "semanal") setSelectedDate(addWeeks(selectedDate, 1));
+          else if (calendarView === "quinzenal") setSelectedDate(addWeeks(selectedDate, 2));
+          else setCurrentMonth(addMonths(currentMonth, 1));
+        }}>→</Button>
       </div>
 
       {/* Calendar grid */}
