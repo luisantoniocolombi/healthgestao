@@ -130,10 +130,16 @@ const Appointments = forwardRef<HTMLDivElement, object>(function Appointments(_p
 
   useEffect(() => { fetchData(); }, [user, currentMonth, selectedDate, calendarView, isAdmin]);
 
-  const days = eachDayOfInterval({
-    start: startOfWeek(startOfMonth(currentMonth), { locale: ptBR }),
-    end: endOfWeek(endOfMonth(currentMonth), { locale: ptBR }),
-  });
+  const days = (() => {
+    const range = getDateRange();
+    if (calendarView === "mensal") {
+      return eachDayOfInterval({
+        start: startOfWeek(range.start, { locale: ptBR }),
+        end: endOfWeek(range.end, { locale: ptBR }),
+      });
+    }
+    return eachDayOfInterval({ start: range.start, end: range.end });
+  })();
 
   const filteredAppointments = patientFilter === "all"
     ? appointments
