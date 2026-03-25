@@ -76,6 +76,7 @@ const Appointments = forwardRef<HTMLDivElement, object>(function Appointments(_p
   const [loading, setLoading] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [view, setView] = useState<"month" | "week" | "day">("month");
+  const [calendarView, setCalendarView] = useState<"semanal" | "quinzenal" | "mensal">("mensal");
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [patientFilter, setPatientFilter] = useState<string>("all");
 
