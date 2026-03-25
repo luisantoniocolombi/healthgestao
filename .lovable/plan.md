@@ -1,16 +1,50 @@
 
 
-# Mostrar todas as 4 colunas no mobile
+# Filtro de Visualização do Calendário: Semanal / Quinzenal / Mensal
 
-## Alteração: `src/pages/Financial.tsx`
+## Resumo
 
-Remover `hidden sm:table-cell` da coluna "Dias" nas linhas 281, 290 e 298, mantendo-a sempre visível. Ajustar o `colSpan` do footer para 3 (já que agora são 4 colunas visíveis). Manter os tamanhos de fonte e padding responsivos (`p-2 sm:p-4`, `text-xs sm:text-sm`) para que tudo caiba no mobile.
+Adicionar um seletor de período na aba de Atendimentos que permite alternar entre 3 modos de exibição do calendário: **Semanal** (7 dias), **Quinzenal** (14 dias) e **Mensal** (mês completo, comportamento atual).
 
-Linhas afetadas:
-- **281**: `hidden sm:table-cell` → visível sempre
-- **290**: `hidden sm:table-cell` → visível sempre  
-- **297**: Footer `colSpan={2}` → `colSpan={3}`
-- **298**: Remover a célula vazia separada (`hidden sm:table-cell`)
+## Alteração: `src/pages/Appointments.tsx`
 
-Sem alterações de banco de dados.
+### 1. Novo estado
+
+```tsx
+const [calendarView, setCalendarView] = useState<"semanal" | "quinzenal" | "mensal">("mensal");
+```
+
+### 2. Cálculo dinâmico dos dias exibidos
+
+Substituir o cálculo fixo de `days` (linhas 117-120) por lógica condicional:
+
+- **Mensal**: mantém o comportamento atual (startOfWeek → endOfWeek do mês)
+- **Semanal**: `startOfWeek(selectedDate)` → `endOfWeek(selectedDate)` (7 dias)
+- **Quinzenal**: `startOfWeek(selectedDate)` → `endOfWeek(selectedDate) + 7 dias` (14 dias)
+
+A navegação com ← / → avança/retrocede conforme o modo: 1 semana, 2 semanas ou 1 mês.
+
+### 3. Ajuste do fetchData
+
+O range de busca dos appointments também será dinâmico: no modo semanal/quinzenal, buscar apenas os dados do intervalo visível (em vez de sempre buscar o mês inteiro), usando o `selectedDate` como referência. O `useEffect` passará a depender também de `calendarView` e `selectedDate` (nos modos semanal/quinzenal).
+
+### 4. UI do filtro
+
+Adicionar um `Select` ao lado do filtro de paciente (na linha 142-154), com as opções:
+- Semanal
+- Quinzenal  
+- Mensal
+
+### 5. Ajuste do header de navegação
+
+O título entre os botões ← / → mostrará:
+- **Mensal**: "março 2026" (atual)
+- **Semanal**: "23/03 - 29/03/2026"
+- **Quinzenal**: "23/03 - 05/04/2026"
+
+### 6. Contadores
+
+Os contadores (Agendados/Realizados/Cancelados) continuarão refletindo os dados carregados, ou seja, se semanal, mostram a contagem da semana.
+
+### Sem alterações no banco de dados.
 
