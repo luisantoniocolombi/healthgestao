@@ -17,7 +17,7 @@ import { ArrowLeft, CalendarDays, Plus, Mic, MicOff, Copy, Check, CheckCircle, R
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, addDays } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, addDays, addWeeks, subWeeks } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 // ========== SPEECH HOOK ==========
@@ -76,18 +76,34 @@ const Appointments = forwardRef<HTMLDivElement, object>(function Appointments(_p
   const [loading, setLoading] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [view, setView] = useState<"month" | "week" | "day">("month");
+  const [calendarView, setCalendarView] = useState<"semanal" | "quinzenal" | "mensal">("mensal");
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [patientFilter, setPatientFilter] = useState<string>("all");
+
+  const getDateRange = () => {
+    if (calendarView === "semanal") {
+      const ws = startOfWeek(selectedDate, { weekStartsOn: 0, locale: ptBR });
+      const we = endOfWeek(selectedDate, { weekStartsOn: 0, locale: ptBR });
+      return { start: ws, end: we };
+    }
+    if (calendarView === "quinzenal") {
+      const ws = startOfWeek(selectedDate, { weekStartsOn: 0, locale: ptBR });
+      const we = endOfWeek(addWeeks(selectedDate, 1), { weekStartsOn: 0, locale: ptBR });
+      return { start: ws, end: we };
+    }
+    return { start: startOfMonth(currentMonth), end: endOfMonth(currentMonth) };
+  };
 
   const fetchData = async () => {
     if (!user) return;
     try {
-      const monthStart = format(startOfMonth(currentMonth), "yyyy-MM-dd");
-      const monthEnd = format(endOfMonth(currentMonth), "yyyy-MM-dd");
+      const range = getDateRange();
+      const rangeStart = format(range.start, "yyyy-MM-dd");
+      const rangeEnd = format(range.end, "yyyy-MM-dd");
 
       const apptQuery = supabase.from("appointments").select("*, patients(nome_completo)")
           .eq("archived", false)
-          .gte("data_atendimento", monthStart).lte("data_atendimento", monthEnd)
+          .gte("data_atendimento", rangeStart).lte("data_atendimento", rangeEnd)
           .order("data_atendimento");
 
       const patQuery = supabase.from("patients").select("id, nome_completo")
@@ -112,12 +128,18 @@ const Appointments = forwardRef<HTMLDivElement, object>(function Appointments(_p
     }
   };
 
-  useEffect(() => { fetchData(); }, [user, currentMonth, isAdmin]);
+  useEffect(() => { fetchData(); }, [user, currentMonth, selectedDate, calendarView, isAdmin]);
 
-  const days = eachDayOfInterval({
-    start: startOfWeek(startOfMonth(currentMonth), { locale: ptBR }),
-    end: endOfWeek(endOfMonth(currentMonth), { locale: ptBR }),
-  });
+  const days = (() => {
+    const range = getDateRange();
+    if (calendarView === "mensal") {
+      return eachDayOfInterval({
+        start: startOfWeek(range.start, { locale: ptBR }),
+        end: endOfWeek(range.end, { locale: ptBR }),
+      });
+    }
+    return eachDayOfInterval({ start: range.start, end: range.end });
+  })();
 
   const filteredAppointments = patientFilter === "all"
     ? appointments
@@ -138,7 +160,7 @@ const Appointments = forwardRef<HTMLDivElement, object>(function Appointments(_p
         </Button>
       </div>
 
-      {/* Patient filter */}
+      {/* Calendar view filter */}
       <div className="flex flex-col sm:flex-row gap-3">
         <Select value={patientFilter} onValueChange={setPatientFilter}>
           <SelectTrigger className="w-full sm:w-72">
@@ -149,6 +171,16 @@ const Appointments = forwardRef<HTMLDivElement, object>(function Appointments(_p
             {patients.map(p => (
               <SelectItem key={p.id} value={p.id}>{p.nome_completo}</SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+        <Select value={calendarView} onValueChange={(v) => setCalendarView(v as any)}>
+          <SelectTrigger className="w-full sm:w-44">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="semanal">Semanal</SelectItem>
+            <SelectItem value="quinzenal">Quinzenal</SelectItem>
+            <SelectItem value="mensal">Mensal</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -169,11 +201,25 @@ const Appointments = forwardRef<HTMLDivElement, object>(function Appointments(_p
 
       {/* Calendar nav */}
       <div className="flex items-center justify-between">
-        <Button variant="outline" size="sm" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>←</Button>
+        <Button variant="outline" size="sm" onClick={() => {
+          if (calendarView === "semanal") setSelectedDate(subWeeks(selectedDate, 1));
+          else if (calendarView === "quinzenal") setSelectedDate(subWeeks(selectedDate, 2));
+          else setCurrentMonth(subMonths(currentMonth, 1));
+        }}>←</Button>
         <h2 className="text-lg font-semibold capitalize">
-          {format(currentMonth, "MMMM yyyy", { locale: ptBR })}
+          {calendarView === "mensal"
+            ? format(currentMonth, "MMMM yyyy", { locale: ptBR })
+            : (() => {
+                const range = getDateRange();
+                return `${format(range.start, "dd/MM")} - ${format(range.end, "dd/MM/yyyy")}`;
+              })()
+          }
         </h2>
-        <Button variant="outline" size="sm" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>→</Button>
+        <Button variant="outline" size="sm" onClick={() => {
+          if (calendarView === "semanal") setSelectedDate(addWeeks(selectedDate, 1));
+          else if (calendarView === "quinzenal") setSelectedDate(addWeeks(selectedDate, 2));
+          else setCurrentMonth(addMonths(currentMonth, 1));
+        }}>→</Button>
       </div>
 
       {/* Calendar grid */}
@@ -191,7 +237,7 @@ const Appointments = forwardRef<HTMLDivElement, object>(function Appointments(_p
                 <div
                   key={day.toISOString()}
                   className={`min-h-[60px] sm:min-h-[80px] p-1 border rounded-sm cursor-pointer hover:bg-muted/50 transition-colors ${
-                    !isSameMonth(day, currentMonth) ? "opacity-30" : ""
+                    calendarView === "mensal" && !isSameMonth(day, currentMonth) ? "opacity-30" : ""
                   } ${isToday ? "bg-primary/5 border-primary" : ""} ${isSelected && !isToday ? "bg-accent/30 border-accent" : ""}`}
                   onClick={() => setSelectedDate(day)}
                 >
