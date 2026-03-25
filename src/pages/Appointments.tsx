@@ -80,15 +80,30 @@ const Appointments = forwardRef<HTMLDivElement, object>(function Appointments(_p
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [patientFilter, setPatientFilter] = useState<string>("all");
 
+  const getDateRange = () => {
+    if (calendarView === "semanal") {
+      const ws = startOfWeek(selectedDate, { weekStartsOn: 0, locale: ptBR });
+      const we = endOfWeek(selectedDate, { weekStartsOn: 0, locale: ptBR });
+      return { start: ws, end: we };
+    }
+    if (calendarView === "quinzenal") {
+      const ws = startOfWeek(selectedDate, { weekStartsOn: 0, locale: ptBR });
+      const we = endOfWeek(addWeeks(selectedDate, 1), { weekStartsOn: 0, locale: ptBR });
+      return { start: ws, end: we };
+    }
+    return { start: startOfMonth(currentMonth), end: endOfMonth(currentMonth) };
+  };
+
   const fetchData = async () => {
     if (!user) return;
     try {
-      const monthStart = format(startOfMonth(currentMonth), "yyyy-MM-dd");
-      const monthEnd = format(endOfMonth(currentMonth), "yyyy-MM-dd");
+      const range = getDateRange();
+      const rangeStart = format(range.start, "yyyy-MM-dd");
+      const rangeEnd = format(range.end, "yyyy-MM-dd");
 
       const apptQuery = supabase.from("appointments").select("*, patients(nome_completo)")
           .eq("archived", false)
-          .gte("data_atendimento", monthStart).lte("data_atendimento", monthEnd)
+          .gte("data_atendimento", rangeStart).lte("data_atendimento", rangeEnd)
           .order("data_atendimento");
 
       const patQuery = supabase.from("patients").select("id, nome_completo")
@@ -113,7 +128,7 @@ const Appointments = forwardRef<HTMLDivElement, object>(function Appointments(_p
     }
   };
 
-  useEffect(() => { fetchData(); }, [user, currentMonth, isAdmin]);
+  useEffect(() => { fetchData(); }, [user, currentMonth, selectedDate, calendarView, isAdmin]);
 
   const days = eachDayOfInterval({
     start: startOfWeek(startOfMonth(currentMonth), { locale: ptBR }),
