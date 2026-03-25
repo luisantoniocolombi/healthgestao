@@ -237,7 +237,7 @@ const Appointments = forwardRef<HTMLDivElement, object>(function Appointments(_p
                 <div
                   key={day.toISOString()}
                   className={`min-h-[60px] sm:min-h-[80px] p-1 border rounded-sm cursor-pointer hover:bg-muted/50 transition-colors ${
-                    !isSameMonth(day, currentMonth) ? "opacity-30" : ""
+                    calendarView === "mensal" && !isSameMonth(day, currentMonth) ? "opacity-30" : ""
                   } ${isToday ? "bg-primary/5 border-primary" : ""} ${isSelected && !isToday ? "bg-accent/30 border-accent" : ""}`}
                   onClick={() => setSelectedDate(day)}
                 >
