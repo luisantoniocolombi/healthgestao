@@ -160,7 +160,7 @@ const Appointments = forwardRef<HTMLDivElement, object>(function Appointments(_p
         </Button>
       </div>
 
-      {/* Patient filter */}
+      {/* Calendar view filter */}
       <div className="flex flex-col sm:flex-row gap-3">
         <Select value={patientFilter} onValueChange={setPatientFilter}>
           <SelectTrigger className="w-full sm:w-72">
@@ -171,6 +171,16 @@ const Appointments = forwardRef<HTMLDivElement, object>(function Appointments(_p
             {patients.map(p => (
               <SelectItem key={p.id} value={p.id}>{p.nome_completo}</SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+        <Select value={calendarView} onValueChange={(v) => setCalendarView(v as any)}>
+          <SelectTrigger className="w-full sm:w-44">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="semanal">Semanal</SelectItem>
+            <SelectItem value="quinzenal">Quinzenal</SelectItem>
+            <SelectItem value="mensal">Mensal</SelectItem>
           </SelectContent>
         </Select>
       </div>
