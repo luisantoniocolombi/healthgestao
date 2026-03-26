@@ -1,50 +1,32 @@
 
 
-# Filtro de Visualização do Calendário: Semanal / Quinzenal / Mensal
+# Excluir atendimento: opção de excluir apenas este ou todos futuros
 
-## Resumo
+## Problema
 
-Adicionar um seletor de período na aba de Atendimentos que permite alternar entre 3 modos de exibição do calendário: **Semanal** (7 dias), **Quinzenal** (14 dias) e **Mensal** (mês completo, comportamento atual).
+Atualmente, ao clicar em "Excluir" num atendimento, ele é arquivado sem perguntar sobre outros atendimentos futuros do mesmo paciente.
 
-## Alteração: `src/pages/Appointments.tsx`
+## Solução
 
-### 1. Novo estado
+### Arquivo: `src/pages/Appointments.tsx`
 
-```tsx
-const [calendarView, setCalendarView] = useState<"semanal" | "quinzenal" | "mensal">("mensal");
-```
+Substituir o `AlertDialog` atual de exclusão (linhas 808-836) por um dialog customizado com duas opções:
 
-### 2. Cálculo dinâmico dos dias exibidos
+1. **"Apenas este atendimento"** — comportamento atual, arquiva só o atendimento aberto
+2. **"Este e todos os futuros agendados"** — arquiva este atendimento E todos os atendimentos do mesmo paciente com:
+   - `data_atendimento > data do atendimento atual` (estritamente futuros)
+   - `status = 'agendado'` (não apaga realizados nem cancelados)
+   - `archived = false`
 
-Substituir o cálculo fixo de `days` (linhas 117-120) por lógica condicional:
+### Implementação
 
-- **Mensal**: mantém o comportamento atual (startOfWeek → endOfWeek do mês)
-- **Semanal**: `startOfWeek(selectedDate)` → `endOfWeek(selectedDate)` (7 dias)
-- **Quinzenal**: `startOfWeek(selectedDate)` → `endOfWeek(selectedDate) + 7 dias` (14 dias)
+- Trocar o `AlertDialog` por um `Dialog` (do `@/components/ui/dialog`) para ter mais controle no layout
+- Dentro do dialog, dois botões:
+  - "Apenas este" → `supabase.from("appointments").update({ archived: true }).eq("id", id)`
+  - "Este e futuros agendados" → executa o acima + `supabase.from("appointments").update({ archived: true }).eq("patient_id", form.patient_id).gt("data_atendimento", form.data_atendimento).eq("status", "agendado").eq("archived", false)`
+- Ambos redirecionam para `/atendimentos` com toast de sucesso
+- Importar `Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription` de `@/components/ui/dialog`
+- Adicionar estado `deleteDialogOpen` para controlar o dialog
 
-A navegação com ← / → avança/retrocede conforme o modo: 1 semana, 2 semanas ou 1 mês.
-
-### 3. Ajuste do fetchData
-
-O range de busca dos appointments também será dinâmico: no modo semanal/quinzenal, buscar apenas os dados do intervalo visível (em vez de sempre buscar o mês inteiro), usando o `selectedDate` como referência. O `useEffect` passará a depender também de `calendarView` e `selectedDate` (nos modos semanal/quinzenal).
-
-### 4. UI do filtro
-
-Adicionar um `Select` ao lado do filtro de paciente (na linha 142-154), com as opções:
-- Semanal
-- Quinzenal  
-- Mensal
-
-### 5. Ajuste do header de navegação
-
-O título entre os botões ← / → mostrará:
-- **Mensal**: "março 2026" (atual)
-- **Semanal**: "23/03 - 29/03/2026"
-- **Quinzenal**: "23/03 - 05/04/2026"
-
-### 6. Contadores
-
-Os contadores (Agendados/Realizados/Cancelados) continuarão refletindo os dados carregados, ou seja, se semanal, mostram a contagem da semana.
-
-### Sem alterações no banco de dados.
+### Sem alterações no banco de dados
 
