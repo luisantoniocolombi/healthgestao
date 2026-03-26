@@ -367,6 +367,7 @@ export const AppointmentForm = forwardRef<HTMLDivElement, object>(function Appoi
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(false);
   const [existing, setExisting] = useState<Appointment | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const [form, setForm] = useState({
     patient_id: params.get("paciente") || "",
