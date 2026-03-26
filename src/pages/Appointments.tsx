@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { ArrowLeft, CalendarDays, Plus, Mic, MicOff, Copy, Check, CheckCircle, RotateCcw, AlertTriangle, Trash2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, addDays, addWeeks, subWeeks } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -367,6 +367,7 @@ export const AppointmentForm = forwardRef<HTMLDivElement, object>(function Appoi
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(false);
   const [existing, setExisting] = useState<Appointment | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const [form, setForm] = useState({
     patient_id: params.get("paciente") || "",
@@ -806,34 +807,53 @@ export const AppointmentForm = forwardRef<HTMLDivElement, object>(function Appoi
                 Cancelar
               </Button>
               {id && (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button type="button" variant="destructive" className="ml-auto">
-                      <Trash2 className="h-4 w-4 mr-1" /> Excluir
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Excluir atendimento?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Esta ação não pode ser desfeita. O atendimento será removido permanentemente.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        onClick={async () => {
-                          await supabase.from("appointments").update({ archived: true }).eq("id", id);
-                          toast.success("Atendimento excluído!");
-                          navigate("/atendimentos");
-                        }}
-                      >
-                        Excluir
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                <>
+                  <Button type="button" variant="destructive" className="ml-auto" onClick={() => setDeleteDialogOpen(true)}>
+                    <Trash2 className="h-4 w-4 mr-1" /> Excluir
+                  </Button>
+                  <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Excluir atendimento?</DialogTitle>
+                        <DialogDescription>
+                          Escolha se deseja excluir apenas este atendimento ou também todos os futuros agendados para este paciente.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="flex flex-col gap-2 pt-2">
+                        <Button
+                          variant="destructive"
+                          onClick={async () => {
+                            await supabase.from("appointments").update({ archived: true }).eq("id", id);
+                            toast.success("Atendimento excluído!");
+                            navigate("/atendimentos");
+                          }}
+                        >
+                          Apenas este atendimento
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          onClick={async () => {
+                            await supabase.from("appointments").update({ archived: true }).eq("id", id);
+                            await supabase
+                              .from("appointments")
+                              .update({ archived: true })
+                              .eq("patient_id", form.patient_id)
+                              .gt("data_atendimento", form.data_atendimento)
+                              .eq("status", "agendado")
+                              .eq("archived", false);
+                            toast.success("Atendimento e futuros agendados excluídos!");
+                            navigate("/atendimentos");
+                          }}
+                        >
+                          Este e todos os futuros agendados
+                        </Button>
+                        <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+                          Cancelar
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </>
               )}
             </div>
           </form>
