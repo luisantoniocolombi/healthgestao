@@ -1,32 +1,28 @@
+# Botão "Editar valor" no Financeiro
 
+## Resposta curta
+Sim, é seguro. Não é preciso mudar nada no banco de dados: nenhuma tabela, coluna ou regra de acesso nova. Só muda a tela do Financeiro. Nenhum dado existente é apagado ou alterado, a não ser o valor que você editar de propósito.
 
-# Excluir atendimento: opção de excluir apenas este ou todos futuros
+## O que muda para você
+- Cada recebível na lista do Financeiro ganha um botão de lápis (Editar).
+- Ao clicar, abre uma janela pequena com o valor atual preenchido.
+- Você digita o novo valor e clica em "Salvar". O valor do recebível é atualizado e a lista e os totais do topo são recalculados.
+- Se o valor ficar vazio, for zero ou negativo, o sistema avisa e não salva.
 
-## Problema
+## Quem pode editar
+Valem as mesmas regras de acesso de hoje:
+- O profissional edita só os próprios recebíveis.
+- O admin edita os recebíveis da conta toda.
 
-Atualmente, ao clicar em "Excluir" num atendimento, ele é arquivado sem perguntar sobre outros atendimentos futuros do mesmo paciente.
+## O que não muda
+- O banco de dados: estrutura, dados existentes e regras de acesso.
+- O atendimento ligado ao recebível.
+- Status, data, forma de pagamento e o resto da tela.
 
-## Solução
-
-### Arquivo: `src/pages/Appointments.tsx`
-
-Substituir o `AlertDialog` atual de exclusão (linhas 808-836) por um dialog customizado com duas opções:
-
-1. **"Apenas este atendimento"** — comportamento atual, arquiva só o atendimento aberto
-2. **"Este e todos os futuros agendados"** — arquiva este atendimento E todos os atendimentos do mesmo paciente com:
-   - `data_atendimento > data do atendimento atual` (estritamente futuros)
-   - `status = 'agendado'` (não apaga realizados nem cancelados)
-   - `archived = false`
-
-### Implementação
-
-- Trocar o `AlertDialog` por um `Dialog` (do `@/components/ui/dialog`) para ter mais controle no layout
-- Dentro do dialog, dois botões:
-  - "Apenas este" → `supabase.from("appointments").update({ archived: true }).eq("id", id)`
-  - "Este e futuros agendados" → executa o acima + `supabase.from("appointments").update({ archived: true }).eq("patient_id", form.patient_id).gt("data_atendimento", form.data_atendimento).eq("status", "agendado").eq("archived", false)`
-- Ambos redirecionam para `/atendimentos` com toast de sucesso
-- Importar `Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription` de `@/components/ui/dialog`
-- Adicionar estado `deleteDialogOpen` para controlar o dialog
-
-### Sem alterações no banco de dados
-
+## Detalhes técnicos
+- Arquivo: só `src/pages/Financial.tsx`.
+- Novos estados: `editDialog` (o recebível em edição, ou null) e `editValor`.
+- Nova função `updateValor`: `supabase.from("receivables").update({ valor, updated_by: user.id }).eq("id", id)`, seguida de toast e `fetchData()`.
+- Botão com ícone `Edit` (já importado) ao lado de Check/X, visível em todos os status.
+- O `Dialog` usa os componentes que já estão importados.
+- As regras de acesso atuais ("Users manage own receivables" e "Admins update receivables in same account") já permitem essa alteração.
