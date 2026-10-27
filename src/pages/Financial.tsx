@@ -41,6 +41,7 @@ const Financial = forwardRef<HTMLDivElement, object>(function Financial(_props, 
   const [newDialog, setNewDialog] = useState(false);
   const [editDialog, setEditDialog] = useState<Receivable | null>(null);
   const [editValor, setEditValor] = useState("");
+  const [editStatus, setEditStatus] = useState("pendente");
   const [newForm, setNewForm] = useState({
     patient_id: "",
     data_cobranca: format(new Date(), "yyyy-MM-dd"),
@@ -131,9 +132,14 @@ const Financial = forwardRef<HTMLDivElement, object>(function Financial(_props, 
     if (!user || !editDialog) return;
     const valor = parseFloat(editValor);
     if (!editValor || isNaN(valor) || valor <= 0) { toast.error("Informe um valor válido"); return; }
-    const { error } = await supabase.from("receivables").update({ valor, updated_by: user.id }).eq("id", editDialog.id);
-    if (error) { toast.error("Erro ao atualizar valor"); return; }
-    toast.success("Valor atualizado!");
+    const data_pagamento = editStatus === "pago"
+      ? (editDialog.data_pagamento || format(new Date(), "yyyy-MM-dd"))
+      : null;
+    const { error } = await supabase.from("receivables").update({
+      valor, status_pagamento: editStatus, data_pagamento, updated_by: user.id,
+    }).eq("id", editDialog.id);
+    if (error) { toast.error("Erro ao atualizar"); return; }
+    toast.success("Recebível atualizado!");
     setEditDialog(null);
     fetchData();
   };
@@ -381,7 +387,7 @@ const Financial = forwardRef<HTMLDivElement, object>(function Financial(_props, 
                   }>
                     {r.status_pagamento}
                   </Badge>
-                  <Button size="sm" variant="outline" onClick={() => { setEditDialog(r); setEditValor(String(r.valor)); }} title="Editar valor">
+                  <Button size="sm" variant="outline" onClick={() => { setEditDialog(r); setEditValor(String(r.valor)); setEditStatus(r.status_pagamento); }} title="Editar">
                     <Edit className="h-3 w-3" />
                   </Button>
                   {r.status_pagamento === "pendente" && (
@@ -411,6 +417,17 @@ const Financial = forwardRef<HTMLDivElement, object>(function Financial(_props, 
             <div className="space-y-2">
               <Label>Valor (R$)</Label>
               <Input type="number" step="0.01" value={editValor} onChange={(e) => setEditValor(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Status do pagamento</Label>
+              <Select value={editStatus} onValueChange={setEditStatus}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pendente">Pendente</SelectItem>
+                  <SelectItem value="pago">Pago</SelectItem>
+                  <SelectItem value="cancelado">Cancelado</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <Button onClick={updateValor} className="w-full">Salvar</Button>
           </div>
