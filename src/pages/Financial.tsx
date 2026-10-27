@@ -39,6 +39,8 @@ const Financial = forwardRef<HTMLDivElement, object>(function Financial(_props, 
   // New receivable dialog
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [newDialog, setNewDialog] = useState(false);
+  const [editDialog, setEditDialog] = useState<Receivable | null>(null);
+  const [editValor, setEditValor] = useState("");
   const [newForm, setNewForm] = useState({
     patient_id: "",
     data_cobranca: format(new Date(), "yyyy-MM-dd"),
@@ -122,6 +124,17 @@ const Financial = forwardRef<HTMLDivElement, object>(function Financial(_props, 
     }).eq("id", id);
     if (error) { toast.error("Erro"); return; }
     toast.success("Cancelado");
+    fetchData();
+  };
+
+  const updateValor = async () => {
+    if (!user || !editDialog) return;
+    const valor = parseFloat(editValor);
+    if (!editValor || isNaN(valor) || valor <= 0) { toast.error("Informe um valor válido"); return; }
+    const { error } = await supabase.from("receivables").update({ valor, updated_by: user.id }).eq("id", editDialog.id);
+    if (error) { toast.error("Erro ao atualizar valor"); return; }
+    toast.success("Valor atualizado!");
+    setEditDialog(null);
     fetchData();
   };
 
@@ -368,6 +381,9 @@ const Financial = forwardRef<HTMLDivElement, object>(function Financial(_props, 
                   }>
                     {r.status_pagamento}
                   </Badge>
+                  <Button size="sm" variant="outline" onClick={() => { setEditDialog(r); setEditValor(String(r.valor)); }} title="Editar valor">
+                    <Edit className="h-3 w-3" />
+                  </Button>
                   {r.status_pagamento === "pendente" && (
                     <>
                       <Button size="sm" variant="outline" onClick={() => markAsPaid(r.id)} title="Marcar como pago">
@@ -384,6 +400,22 @@ const Financial = forwardRef<HTMLDivElement, object>(function Financial(_props, 
           ))}
         </div>
       )}
+
+      <Dialog open={!!editDialog} onOpenChange={(o) => { if (!o) setEditDialog(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar valor</DialogTitle>
+            <DialogDescription>{(editDialog as any)?.patients?.nome_completo || ""}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label>Valor (R$)</Label>
+              <Input type="number" step="0.01" value={editValor} onChange={(e) => setEditValor(e.target.value)} />
+            </div>
+            <Button onClick={updateValor} className="w-full">Salvar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 });
