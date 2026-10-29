@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, Edit, Save, Plus, FileText, Trash2, Download } from "lucide-react";
 import { toast } from "sonner";
+import { DocumentField, ConvenioField } from "@/components/PatientFields";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -295,23 +296,7 @@ const PatientDetail = forwardRef<HTMLDivElement, object>(function PatientDetail(
                   <Label>Telefone</Label>
                   <Input value={form.telefone || ""} onChange={(e) => update("telefone", e.target.value)} disabled={!editing} />
                 </div>
-                <div className="space-y-2">
-                  <Label>CPF</Label>
-                  <Input
-                    value={form.cpf || ""}
-                    onChange={(e) => {
-                      const raw = e.target.value.replace(/\D/g, "").slice(0, 11);
-                      const masked = raw
-                        .replace(/(\d{3})(\d)/, "$1.$2")
-                        .replace(/(\d{3})(\d)/, "$1.$2")
-                        .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
-                      update("cpf", masked);
-                    }}
-                    disabled={!editing}
-                    placeholder="000.000.000-00"
-                    maxLength={14}
-                  />
-                </div>
+                <DocumentField value={form.cpf || ""} onChange={(v) => update("cpf", v)} disabled={!editing} />
                 <div className="space-y-2">
                   <Label>Data de Nascimento</Label>
                   <Input type="date" value={form.data_nascimento || ""} onChange={(e) => update("data_nascimento", e.target.value)} disabled={!editing} />
@@ -332,18 +317,7 @@ const PatientDetail = forwardRef<HTMLDivElement, object>(function PatientDetail(
                   <Label>Doença Principal</Label>
                   <Input value={form.doenca_principal || ""} onChange={(e) => update("doenca_principal", e.target.value)} disabled={!editing} />
                 </div>
-                <div className="space-y-2">
-                  <Label>Convênio</Label>
-                  <Select value={form.convenio || ""} onValueChange={(v) => update("convenio", v)} disabled={!editing}>
-                    <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="particular">Particular</SelectItem>
-                      <SelectItem value="unimed">Unimed</SelectItem>
-                      <SelectItem value="gap">GAP</SelectItem>
-                      <SelectItem value="outros">Outros</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <ConvenioField value={form.convenio || ""} onChange={(v) => update("convenio", v)} disabled={!editing} />
                 <div className="flex items-center space-x-2 sm:col-span-2">
                   <Checkbox
                     id="edit_gerar_nfe"
