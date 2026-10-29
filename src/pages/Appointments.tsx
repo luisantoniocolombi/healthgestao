@@ -381,6 +381,7 @@ export const AppointmentForm = forwardRef<HTMLDivElement, object>(function Appoi
   });
 
   const [createReceivable, setCreateReceivable] = useState(false);
+  const [hasReceivable, setHasReceivable] = useState<boolean | null>(null);
   const [receivableForm, setReceivableForm] = useState({
     valor: "",
     observacao: "",
@@ -400,6 +401,9 @@ export const AppointmentForm = forwardRef<HTMLDivElement, object>(function Appoi
       .then(({ data }) => setPatients((data || []) as Patient[]));
 
     if (id) {
+      supabase.from("receivables").select("id", { count: "exact", head: true })
+        .eq("appointment_id", id).eq("archived", false)
+        .then(({ count, error }) => { if (!error) setHasReceivable((count || 0) > 0); });
       supabase.from("appointments").select("*").eq("id", id).maybeSingle()
         .then(({ data, error }) => {
           if (error) { console.error("Erro ao carregar atendimento:", error); return; }
@@ -769,7 +773,7 @@ export const AppointmentForm = forwardRef<HTMLDivElement, object>(function Appoi
             )}
 
             {/* Toggle cobrança */}
-            {!id && (
+            {(!id || hasReceivable === false) && (
               <div className="space-y-3 p-4 border rounded-lg">
                 <div className="flex items-center gap-3">
                   <Switch checked={createReceivable} onCheckedChange={setCreateReceivable} />
