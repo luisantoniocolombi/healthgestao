@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
+import { DocumentField, ConvenioField } from "@/components/PatientFields";
 
 const PatientForm = forwardRef<HTMLDivElement, object>(function PatientForm(_props, ref) {
   const { user, isAdmin } = useAuth();
@@ -93,23 +94,7 @@ const PatientForm = forwardRef<HTMLDivElement, object>(function PatientForm(_pro
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="cpf">CPF</Label>
-                <Input
-                  id="cpf"
-                  value={form.cpf}
-                  onChange={(e) => {
-                    const raw = e.target.value.replace(/\D/g, "").slice(0, 11);
-                    const masked = raw
-                      .replace(/(\d{3})(\d)/, "$1.$2")
-                      .replace(/(\d{3})(\d)/, "$1.$2")
-                      .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
-                    update("cpf", masked);
-                  }}
-                  placeholder="000.000.000-00"
-                  maxLength={14}
-                />
-              </div>
+              <DocumentField id="cpf" value={form.cpf} onChange={(v) => update("cpf", v)} />
               <div className="space-y-2">
                 <Label htmlFor="nascimento">Data de Nascimento</Label>
                 <Input
@@ -152,18 +137,7 @@ const PatientForm = forwardRef<HTMLDivElement, object>(function PatientForm(_pro
                   onChange={(e) => update("doenca_principal", e.target.value)}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="convenio">Convênio</Label>
-                <Select value={form.convenio} onValueChange={(v) => update("convenio", v)}>
-                  <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="particular">Particular</SelectItem>
-                    <SelectItem value="unimed">Unimed</SelectItem>
-                    <SelectItem value="gap">GAP</SelectItem>
-                    <SelectItem value="outros">Outros</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <ConvenioField value={form.convenio} onChange={(v) => update("convenio", v)} />
               <div className="flex items-center space-x-2 sm:col-span-2">
                 <Checkbox
                   id="gerar_nfe"
