@@ -26,7 +26,7 @@ export function detectDocType(value?: string | null): "cpf" | "cnpj" {
 
 export function DocumentField({ value, onChange, disabled, id }: { value: string; onChange: (v: string) => void; disabled?: boolean; id?: string }) {
   const [tipo, setTipo] = useState<"cpf" | "cnpj">(detectDocType(value));
-  useEffect(() => { setTipo(detectDocType(value)); }, [value === "" ? "" : detectDocType(value)]); // sync when loaded
+  useEffect(() => { if (disabled) setTipo(detectDocType(value)); }, [value, disabled]);
   const changeTipo = (t: "cpf" | "cnpj") => { setTipo(t); onChange(""); };
   return (
     <div className="space-y-2">
