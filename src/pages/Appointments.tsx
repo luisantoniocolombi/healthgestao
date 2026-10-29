@@ -381,6 +381,7 @@ export const AppointmentForm = forwardRef<HTMLDivElement, object>(function Appoi
   });
 
   const [createReceivable, setCreateReceivable] = useState(false);
+  const [hasReceivable, setHasReceivable] = useState<boolean | null>(null);
   const [receivableForm, setReceivableForm] = useState({
     valor: "",
     observacao: "",
@@ -400,6 +401,9 @@ export const AppointmentForm = forwardRef<HTMLDivElement, object>(function Appoi
       .then(({ data }) => setPatients((data || []) as Patient[]));
 
     if (id) {
+      supabase.from("receivables").select("id", { count: "exact", head: true })
+        .eq("appointment_id", id).eq("archived", false)
+        .then(({ count, error }) => { if (!error) setHasReceivable((count || 0) > 0); });
       supabase.from("appointments").select("*").eq("id", id).maybeSingle()
         .then(({ data, error }) => {
           if (error) { console.error("Erro ao carregar atendimento:", error); return; }
@@ -462,7 +466,7 @@ export const AppointmentForm = forwardRef<HTMLDivElement, object>(function Appoi
         const valorParceiro = totalValor * pct;
         const valorPrincipal = totalValor - valorParceiro;
 
-        await Promise.all([
+        const recResults = await Promise.all([
           supabase.from("receivables").insert({
             user_id: user.id,
             patient_id: form.patient_id,
@@ -488,8 +492,12 @@ export const AppointmentForm = forwardRef<HTMLDivElement, object>(function Appoi
             updated_by: user.id,
           }),
         ]);
+        if (recResults.some(r => r.error)) {
+          console.error("Erro ao criar cobrança:", recResults.map(r => r.error));
+          toast.error("Atendimento salvo, mas a cobrança não foi gravada por completo. Confira no Financeiro.");
+        }
       } else {
-        await supabase.from("receivables").insert({
+        const { error: recError } = await supabase.from("receivables").insert({
           user_id: user.id,
           patient_id: form.patient_id,
           appointment_id: appointmentId,
@@ -501,6 +509,12 @@ export const AppointmentForm = forwardRef<HTMLDivElement, object>(function Appoi
           created_by: user.id,
           updated_by: user.id,
         });
+        if (recError) {
+          console.error("Erro ao criar cobrança:", recError);
+          toast.error("Atendimento salvo, mas a cobrança não foi gravada. Tente novamente.");
+          setLoading(false);
+          return;
+        }
       }
     }
 
@@ -769,7 +783,7 @@ export const AppointmentForm = forwardRef<HTMLDivElement, object>(function Appoi
             )}
 
             {/* Toggle cobrança */}
-            {!id && (
+            {(!id || hasReceivable === false) && (
               <div className="space-y-3 p-4 border rounded-lg">
                 <div className="flex items-center gap-3">
                   <Switch checked={createReceivable} onCheckedChange={setCreateReceivable} />
