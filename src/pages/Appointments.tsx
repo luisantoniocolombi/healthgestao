@@ -466,7 +466,7 @@ export const AppointmentForm = forwardRef<HTMLDivElement, object>(function Appoi
         const valorParceiro = totalValor * pct;
         const valorPrincipal = totalValor - valorParceiro;
 
-        await Promise.all([
+        const recResults = await Promise.all([
           supabase.from("receivables").insert({
             user_id: user.id,
             patient_id: form.patient_id,
@@ -492,8 +492,12 @@ export const AppointmentForm = forwardRef<HTMLDivElement, object>(function Appoi
             updated_by: user.id,
           }),
         ]);
+        if (recResults.some(r => r.error)) {
+          console.error("Erro ao criar cobrança:", recResults.map(r => r.error));
+          toast.error("Atendimento salvo, mas a cobrança não foi gravada por completo. Confira no Financeiro.");
+        }
       } else {
-        await supabase.from("receivables").insert({
+        const { error: recError } = await supabase.from("receivables").insert({
           user_id: user.id,
           patient_id: form.patient_id,
           appointment_id: appointmentId,
@@ -505,6 +509,12 @@ export const AppointmentForm = forwardRef<HTMLDivElement, object>(function Appoi
           created_by: user.id,
           updated_by: user.id,
         });
+        if (recError) {
+          console.error("Erro ao criar cobrança:", recError);
+          toast.error("Atendimento salvo, mas a cobrança não foi gravada. Tente novamente.");
+          setLoading(false);
+          return;
+        }
       }
     }
 
