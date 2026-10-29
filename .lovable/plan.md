@@ -1,22 +1,20 @@
-# Lançamentos da Cynthia no Contas a Receber
+# Opção "Criar cobrança" ao abrir um atendimento já lançado
 
 ## O que encontrei
-- Login da Cynthia: cz.neuroexcelencia@gmail.com (admin).
-- Até 09/04 todos os atendimentos dela geravam valor a receber normalmente.
-- Em 28/10 ela lançou 21 atendimentos (de 26/10 a 30/10) e **nenhum** gerou valor a receber.
-- Os atendimentos estão salvos. O que não foi salvo é o valor no Contas a Receber.
-- O banco não mostra nenhum erro nesses horários. As regras de acesso permitem que ela grave.
-- Outra profissional (Simone) lançou atendimentos com valor no mesmo dia e funcionou.
+- Login da Cynthia: cz.neuroexcelencia@gmail.com.
+- Em 28/10 ela lançou 21 atendimentos (26/10 a 30/10). Todos estão salvos, mas **nenhum** tem valor no Contas a Receber.
+- O print confirma a causa: a opção "Criar cobrança deste atendimento?" só aparece quando o atendimento é **novo**. Quando ela abre um atendimento já lançado (como o agendado do print), a opção some. Assim, quem lançou sem ligar a opção não consegue mais incluir o valor por essa tela.
+- O banco e as regras de acesso estão corretos. Ela tem permissão para gravar.
 
-## Causa provável (não confirmada)
-Na tela do atendimento, o valor só é gravado se a opção "Gerar recebível" estiver ligada e o campo valor estiver preenchido. Essa opção começa **desligada**. Além disso, se a gravação do valor falhar, o sistema não mostra nenhum aviso e diz "salvo" mesmo assim. Por isso, nem ela nem nós ficamos sabendo do problema.
-
-## Proposta (sem mexer no banco)
-1. Se a gravação do valor falhar, mostrar uma mensagem de erro clara em vez de dizer "salvo".
-2. Se ela digitar um valor, mas a opção "Gerar recebível" estiver desligada, avisar antes de salvar.
-3. Depois disso, peço para a Cynthia lançar um atendimento de teste e confirmo no sistema se o valor ficou gravado.
-4. Os 21 atendimentos de outubro continuam sem valor. Ela pode incluir os valores pelo botão "Novo Recebível" no Financeiro, ou você me passa os valores e eu lanço por ela.
+## O que vou mudar (sem mexer no banco)
+1. Ao abrir um atendimento já lançado, mostrar a opção "Criar cobrança deste atendimento?" **se ele ainda não tiver cobrança**. Se já tiver, a opção continua escondida, para não cobrar duas vezes.
+2. Se a gravação do valor falhar, mostrar uma mensagem de erro em vez de dizer "salvo".
+3. Com isso, a Cynthia pode abrir cada um dos 21 atendimentos, ligar a opção, informar o valor e salvar.
 
 ## Detalhes técnicos
-- Só muda `src/pages/Appointments.tsx` (handleSubmit, linhas ~456-505 e ~533-580): conferir o `error` de cada `insert` em `receivables`, mostrar `toast.error` e não navegar se houver erro.
-- Nenhuma mudança no banco, nas tabelas ou nas regras de acesso.
+- Só muda `src/pages/Appointments.tsx`.
+- Ao carregar um atendimento existente, consultar `receivables` com `appointment_id = id` e `archived = false`; guardar `hasReceivable`.
+- Trocar `{!id && (` por `{(!id || !hasReceivable) && (` no bloco do toggle.
+- No `handleSubmit`, conferir o `error` de cada `insert` em `receivables` e mostrar `toast.error`.
+- A repetição semanal continua só para atendimentos novos.
+- Nenhuma mudança em tabelas, colunas ou regras de acesso.
