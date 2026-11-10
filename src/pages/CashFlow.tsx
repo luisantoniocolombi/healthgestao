@@ -45,7 +45,7 @@ interface CashFlowEntry {
   original: Receivable | Expense;
 }
 
-const categorias = ["Fixo", "Variável", "Pessoal", "Material", "Outro"];
+const categorias = ["Fixo", "Variável", "Pessoal", "Material", "Impostos / NFe", "Repasse Profissional", "Outro"];
 
 const CashFlow = forwardRef<HTMLDivElement, object>(function CashFlow(_props, ref) {
   const { user, contaPrincipalId } = useAuth();

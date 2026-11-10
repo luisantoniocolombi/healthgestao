@@ -22,7 +22,7 @@ import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addWeeks, sub
 import { ptBR } from "date-fns/locale";
 
 const Financial = forwardRef<HTMLDivElement, object>(function Financial(_props, ref) {
-  const { user } = useAuth();
+  const { user, contaPrincipalId } = useAuth();
   const { profileMap, isAdmin } = useAccountProfiles();
   const navigate = useNavigate();
   const [receivables, setReceivables] = useState<Receivable[]>([]);
@@ -112,6 +112,50 @@ const Financial = forwardRef<HTMLDivElement, object>(function Financial(_props, 
   const totalNfe = filtered.filter(r => (r as any).gerar_nfe && r.status_pagamento !== "cancelado").reduce((s, r) => s + Number(r.valor), 0);
   const countNfe = filtered.filter(r => (r as any).gerar_nfe && r.status_pagamento !== "cancelado").length;
 
+  // Despesas automáticas (imposto NFe / repasse) ligadas ao recebível via marcador [rec:id]
+  const syncAutoExpenses = async (r: Receivable, newStatus: string, valorAtual: number, dataPag: string | null) => {
+    const marker = `[rec:${r.id}]`;
+    const isParceiro = (r.observacao || "").startsWith("Parceiro");
+    const pct = Number((r as any).percentual_nfe) || 0;
+    if (!isParceiro && !pct) return;
+    if (newStatus !== "pago") {
+      if (isAdmin) {
+        await supabase.from("expenses" as any).update({ status: "cancelado" } as any)
+          .like("observacao", `%${marker}%`).eq("status", "pendente");
+      }
+      return;
+    }
+    if (!isAdmin || !contaPrincipalId || !user) {
+      toast.info("Apenas o admin gera a despesa de imposto/repasse ao confirmar o pagamento.");
+      return;
+    }
+    const { data: existing } = await supabase.from("expenses" as any).select("id, status")
+      .like("observacao", `%${marker}%`).eq("archived", false);
+    const ativos = ((existing || []) as any[]).filter(e => e.status !== "cancelado");
+    if (ativos.length > 0) return;
+    const canceladas = ((existing || []) as any[]).filter(e => e.status === "cancelado");
+    if (canceladas.length > 0) {
+      await supabase.from("expenses" as any).update({ status: "pendente" } as any).eq("id", canceladas[0].id);
+      return;
+    }
+    const paciente = (r as any).patients?.nome_completo || "Paciente";
+    const venc = dataPag || format(new Date(), "yyyy-MM-dd");
+    let record: any;
+    if (isParceiro) {
+      const nome = profileMap[r.user_id]?.nome || "Profissional";
+      record = { descricao: `Repasse - ${nome} - ${paciente}`, categoria: "Repasse Profissional", valor: valorAtual };
+    } else {
+      const base = Number((r as any).valor_bruto) || valorAtual;
+      record = { descricao: `Imposto NFe (${pct}%) - ${paciente}`, categoria: "Impostos / NFe", valor: Math.round(base * pct) / 100 };
+    }
+    const { error } = await supabase.from("expenses" as any).insert({
+      ...record, user_id: user.id, conta_principal_id: contaPrincipalId,
+      data_vencimento: venc, status: "pendente", tipo: "despesa", observacao: `Gerado automaticamente ${marker}`,
+    } as any);
+    if (error) toast.error("Pagamento salvo, mas a despesa automática não foi criada.");
+    else toast.success(`Despesa "${record.categoria}" criada como pendente`);
+  };
+
   const markAsPaid = async (id: string) => {
     const { error } = await supabase.from("receivables").update({
       status_pagamento: "pago",
@@ -119,6 +163,8 @@ const Financial = forwardRef<HTMLDivElement, object>(function Financial(_props, 
     }).eq("id", id);
     if (error) { toast.error("Erro"); return; }
     toast.success("Marcado como pago");
+    const r = receivables.find(x => x.id === id);
+    if (r) await syncAutoExpenses(r, "pago", Number(r.valor), format(new Date(), "yyyy-MM-dd"));
     fetchData();
   };
 
@@ -128,6 +174,8 @@ const Financial = forwardRef<HTMLDivElement, object>(function Financial(_props, 
     }).eq("id", id);
     if (error) { toast.error("Erro"); return; }
     toast.success("Cancelado");
+    const r = receivables.find(x => x.id === id);
+    if (r) await syncAutoExpenses(r, "cancelado", Number(r.valor), null);
     fetchData();
   };
 
@@ -143,6 +191,7 @@ const Financial = forwardRef<HTMLDivElement, object>(function Financial(_props, 
     }).eq("id", editDialog.id);
     if (error) { toast.error("Erro ao atualizar"); return; }
     toast.success("Recebível atualizado!");
+    if (editStatus !== editDialog.status_pagamento) await syncAutoExpenses(editDialog, editStatus, valor, data_pagamento);
     setEditDialog(null);
     fetchData();
   };

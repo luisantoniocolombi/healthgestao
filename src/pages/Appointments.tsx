@@ -439,7 +439,8 @@ export const AppointmentForm = forwardRef<HTMLDivElement, object>(function Appoi
     }
     const brutoPrincipal = total - valorParceiro;
     const nfePct = form.gerar_nfe ? (parseFloat(form.percentual_nfe) || 0) : 0;
-    const valorPrincipal = Math.round(brutoPrincipal * (1 - nfePct / 100) * 100) / 100;
+    // Cobrança entra pelo valor cheio; o imposto da NFe vira despesa ao marcar como pago
+    const valorPrincipal = Math.round(brutoPrincipal * 100) / 100;
     return { valorParceiro, valorPrincipal, brutoPrincipal, nfePct };
   };
 
