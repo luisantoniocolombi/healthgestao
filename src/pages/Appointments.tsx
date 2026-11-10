@@ -378,6 +378,9 @@ export const AppointmentForm = forwardRef<HTMLDivElement, object>(function Appoi
     gerar_nfe: false,
     profissional_parceiro_id: "",
     percentual_parceiro: "50",
+    tipo_parceiro: "percentual" as "percentual" | "valor",
+    valor_parceiro: "",
+    percentual_nfe: "",
   });
 
   const [createReceivable, setCreateReceivable] = useState(false);
@@ -418,11 +421,27 @@ export const AppointmentForm = forwardRef<HTMLDivElement, object>(function Appoi
               gerar_nfe: (data as any).gerar_nfe || false,
               profissional_parceiro_id: (data as any).profissional_parceiro_id || "",
               percentual_parceiro: String((data as any).percentual_parceiro || 50),
+              tipo_parceiro: (data as any).valor_parceiro != null ? "valor" : "percentual",
+              valor_parceiro: (data as any).valor_parceiro != null ? String((data as any).valor_parceiro) : "",
+              percentual_nfe: (data as any).percentual_nfe != null ? String((data as any).percentual_nfe) : "",
             });
           }
         });
     }
   }, [user, id]);
+
+  const calcSplit = (total: number) => {
+    let valorParceiro = 0;
+    if (form.profissional_parceiro_id) {
+      valorParceiro = form.tipo_parceiro === "valor"
+        ? Math.min(parseFloat(form.valor_parceiro) || 0, total)
+        : total * ((parseFloat(form.percentual_parceiro) || 0) / 100);
+    }
+    const brutoPrincipal = total - valorParceiro;
+    const nfePct = form.gerar_nfe ? (parseFloat(form.percentual_nfe) || 0) : 0;
+    const valorPrincipal = Math.round(brutoPrincipal * (1 - nfePct / 100) * 100) / 100;
+    return { valorParceiro, valorPrincipal, brutoPrincipal, nfePct };
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -437,7 +456,9 @@ export const AppointmentForm = forwardRef<HTMLDivElement, object>(function Appoi
       status: form.status,
       gerar_nfe: form.gerar_nfe,
       profissional_parceiro_id: form.profissional_parceiro_id || null,
-      percentual_parceiro: form.profissional_parceiro_id ? parseFloat(form.percentual_parceiro) : null,
+      percentual_parceiro: form.profissional_parceiro_id && form.tipo_parceiro === "percentual" ? parseFloat(form.percentual_parceiro) : null,
+      valor_parceiro: form.profissional_parceiro_id && form.tipo_parceiro === "valor" ? parseFloat(form.valor_parceiro) || 0 : null,
+      percentual_nfe: form.gerar_nfe && form.percentual_nfe ? parseFloat(form.percentual_nfe) : null,
       updated_by: user.id,
     };
 
@@ -462,9 +483,7 @@ export const AppointmentForm = forwardRef<HTMLDivElement, object>(function Appoi
       
       if (form.profissional_parceiro_id) {
         // Split: create 2 receivables
-        const pct = parseFloat(form.percentual_parceiro) / 100;
-        const valorParceiro = totalValor * pct;
-        const valorPrincipal = totalValor - valorParceiro;
+        const { valorParceiro, valorPrincipal, brutoPrincipal, nfePct } = calcSplit(totalValor);
 
         const recResults = await Promise.all([
           supabase.from("receivables").insert({
@@ -473,6 +492,8 @@ export const AppointmentForm = forwardRef<HTMLDivElement, object>(function Appoi
             appointment_id: appointmentId,
             data_cobranca: form.data_atendimento,
             valor: valorPrincipal,
+            valor_bruto: nfePct ? brutoPrincipal : null,
+            percentual_nfe: nfePct || null,
             observacao: receivableForm.observacao || null,
             origem: "atendimento",
             gerar_nfe: form.gerar_nfe,
@@ -502,7 +523,9 @@ export const AppointmentForm = forwardRef<HTMLDivElement, object>(function Appoi
           patient_id: form.patient_id,
           appointment_id: appointmentId,
           data_cobranca: form.data_atendimento,
-          valor: totalValor,
+          valor: calcSplit(totalValor).valorPrincipal,
+          valor_bruto: calcSplit(totalValor).nfePct ? totalValor : null,
+          percentual_nfe: calcSplit(totalValor).nfePct || null,
           observacao: receivableForm.observacao || null,
           origem: "atendimento",
           gerar_nfe: form.gerar_nfe,
@@ -531,7 +554,9 @@ export const AppointmentForm = forwardRef<HTMLDivElement, object>(function Appoi
           status: "agendado",
           gerar_nfe: form.gerar_nfe,
           profissional_parceiro_id: form.profissional_parceiro_id || null,
-          percentual_parceiro: form.profissional_parceiro_id ? parseFloat(form.percentual_parceiro) : null,
+          percentual_parceiro: form.profissional_parceiro_id && form.tipo_parceiro === "percentual" ? parseFloat(form.percentual_parceiro) : null,
+          valor_parceiro: form.profissional_parceiro_id && form.tipo_parceiro === "valor" ? parseFloat(form.valor_parceiro) || 0 : null,
+          percentual_nfe: form.gerar_nfe && form.percentual_nfe ? parseFloat(form.percentual_nfe) : null,
           user_id: user.id,
           created_by: user.id,
           updated_by: user.id,
@@ -547,9 +572,7 @@ export const AppointmentForm = forwardRef<HTMLDivElement, object>(function Appoi
         if (createReceivable && receivableForm.valor && recurData) {
           const totalValor = parseFloat(receivableForm.valor);
           if (form.profissional_parceiro_id) {
-            const pct = parseFloat(form.percentual_parceiro) / 100;
-            const valorParceiro = totalValor * pct;
-            const valorPrincipal = totalValor - valorParceiro;
+            const { valorParceiro, valorPrincipal, brutoPrincipal, nfePct } = calcSplit(totalValor);
             await Promise.all([
               supabase.from("receivables").insert({
                 user_id: user.id,
@@ -557,6 +580,8 @@ export const AppointmentForm = forwardRef<HTMLDivElement, object>(function Appoi
                 appointment_id: recurData.id,
                 data_cobranca: nextDate,
                 valor: valorPrincipal,
+                valor_bruto: nfePct ? brutoPrincipal : null,
+                percentual_nfe: nfePct || null,
                 observacao: receivableForm.observacao || null,
                 origem: "atendimento",
                 gerar_nfe: form.gerar_nfe,
@@ -582,7 +607,9 @@ export const AppointmentForm = forwardRef<HTMLDivElement, object>(function Appoi
               patient_id: form.patient_id,
               appointment_id: recurData.id,
               data_cobranca: nextDate,
-              valor: totalValor,
+              valor: calcSplit(totalValor).valorPrincipal,
+              valor_bruto: calcSplit(totalValor).nfePct ? totalValor : null,
+              percentual_nfe: calcSplit(totalValor).nfePct || null,
               observacao: receivableForm.observacao || null,
               origem: "atendimento",
               gerar_nfe: form.gerar_nfe,
@@ -755,6 +782,12 @@ export const AppointmentForm = forwardRef<HTMLDivElement, object>(function Appoi
                 onCheckedChange={(checked) => setForm(prev => ({ ...prev, gerar_nfe: !!checked }))}
               />
               <Label htmlFor="gerar_nfe">Gerar NFe</Label>
+              {form.gerar_nfe && (
+                <div className="flex items-center gap-2 ml-4">
+                  <Label htmlFor="percentual_nfe" className="whitespace-nowrap">% NFe</Label>
+                  <Input id="percentual_nfe" type="number" step="0.01" min="0" max="100" className="w-24" placeholder="0" value={form.percentual_nfe} onChange={(e) => setForm(prev => ({ ...prev, percentual_nfe: e.target.value }))} />
+                </div>
+              )}
             </div>
 
             {/* Partner professional */}
@@ -774,9 +807,26 @@ export const AppointmentForm = forwardRef<HTMLDivElement, object>(function Appoi
                 </Select>
                 {form.profissional_parceiro_id && (
                   <div className="space-y-2">
-                    <Label>% Parceiro</Label>
-                    <Input type="number" min="1" max="99" value={form.percentual_parceiro} onChange={(e) => setForm(prev => ({ ...prev, percentual_parceiro: e.target.value }))} />
-                    <p className="text-xs text-muted-foreground">Você: {100 - Number(form.percentual_parceiro)}% | Parceiro: {form.percentual_parceiro}%</p>
+                    <Label>Repasse do parceiro</Label>
+                    <div className="flex gap-2">
+                      <Select value={form.tipo_parceiro} onValueChange={(v: "percentual" | "valor") => setForm(prev => ({ ...prev, tipo_parceiro: v }))}>
+                        <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="percentual">%</SelectItem>
+                          <SelectItem value="valor">Valor (R$)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {form.tipo_parceiro === "percentual" ? (
+                        <Input type="number" min="1" max="99" value={form.percentual_parceiro} onChange={(e) => setForm(prev => ({ ...prev, percentual_parceiro: e.target.value }))} />
+                      ) : (
+                        <Input type="number" step="0.01" min="0" placeholder="0,00" value={form.valor_parceiro} onChange={(e) => setForm(prev => ({ ...prev, valor_parceiro: e.target.value }))} />
+                      )}
+                    </div>
+                    {form.tipo_parceiro === "percentual" ? (
+                      <p className="text-xs text-muted-foreground">Você: {100 - Number(form.percentual_parceiro)}% | Parceiro: {form.percentual_parceiro}%</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Parceiro recebe R$ {(parseFloat(form.valor_parceiro) || 0).toFixed(2)} | Você fica com o restante</p>
+                    )}
                   </div>
                 )}
               </div>

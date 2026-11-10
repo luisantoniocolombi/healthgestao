@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1794336260401,
+      "tag": "0000_add_parceiro_valor_nfe_percent",
+      "breakpoints": true
+    }
+  ]
+}
