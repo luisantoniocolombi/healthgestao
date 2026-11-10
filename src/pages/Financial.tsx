@@ -32,6 +32,8 @@ const Financial = forwardRef<HTMLDivElement, object>(function Financial(_props, 
   const [statusFilter, setStatusFilter] = useState("todos");
   const [nfeFilter, setNfeFilter] = useState("todos");
   const [search, setSearch] = useState("");
+  const [fonoFilter, setFonoFilter] = useState("todos");
+  const [repasseOpen, setRepasseOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(format(new Date(), "yyyy-MM"));
   const [periodType, setPeriodType] = useState<"mensal" | "semanal">("mensal");
   const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
@@ -95,6 +97,7 @@ const Financial = forwardRef<HTMLDivElement, object>(function Financial(_props, 
     if (statusFilter !== "todos" && r.status_pagamento !== statusFilter) return false;
     if (nfeFilter === "nfe" && !(r as any).gerar_nfe) return false;
     if (nfeFilter === "sem_nfe" && (r as any).gerar_nfe) return false;
+    if (fonoFilter !== "todos" && r.user_id !== fonoFilter) return false;
     if (search) {
       const name = (r as any).patients?.nome_completo?.toLowerCase() || "";
       if (!name.includes(search.toLowerCase())) return false;
@@ -276,6 +279,17 @@ const Financial = forwardRef<HTMLDivElement, object>(function Financial(_props, 
             <SelectItem value="cancelado">Cancelado</SelectItem>
           </SelectContent>
         </Select>
+        {isAdmin && Object.keys(profileMap).length > 0 && (
+          <Select value={fonoFilter} onValueChange={setFonoFilter}>
+            <SelectTrigger className="w-full sm:w-44"><SelectValue placeholder="Fono" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Fono: Todas</SelectItem>
+              {Object.entries(profileMap)
+                .sort(([, a], [, b]) => a.nome.localeCompare(b.nome, "pt-BR"))
+                .map(([pid, prof]) => <SelectItem key={pid} value={pid}>{prof.nome}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
         <Select value={nfeFilter} onValueChange={setNfeFilter}>
           <SelectTrigger className="w-full sm:w-36"><SelectValue /></SelectTrigger>
           <SelectContent>
@@ -285,6 +299,75 @@ const Financial = forwardRef<HTMLDivElement, object>(function Financial(_props, 
           </SelectContent>
         </Select>
       </div>
+
+      {/* Faturamento e Repasses */}
+      {!loading && filtered.length > 0 && (() => {
+        const ativos = filtered.filter(r => r.status_pagamento !== "cancelado");
+        const isRepasse = (r: Receivable) => (r.observacao || "").startsWith("Parceiro");
+        const faturamento = ativos.reduce((s, r) => s + Number(r.valor), 0);
+        const faturamentoPago = ativos.filter(r => r.status_pagamento === "pago").reduce((s, r) => s + Number(r.valor), 0);
+        const fonoMap = new Map<string, { nome: string; atendimentos: number; pendente: number; pago: number }>();
+        ativos.filter(isRepasse).forEach(r => {
+          const e = fonoMap.get(r.user_id) || { nome: profileMap[r.user_id]?.nome || "—", atendimentos: 0, pendente: 0, pago: 0 };
+          e.atendimentos += 1;
+          if (r.status_pagamento === "pago") e.pago += Number(r.valor); else e.pendente += Number(r.valor);
+          fonoMap.set(r.user_id, e);
+        });
+        const rows = Array.from(fonoMap.values()).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+        const totalRepasse = rows.reduce((s, r) => s + r.pendente + r.pago, 0);
+        return (
+          <Collapsible open={repasseOpen} onOpenChange={setRepasseOpen}>
+            <Card>
+              <CollapsibleTrigger asChild>
+                <CardHeader className="pb-3 cursor-pointer flex flex-row items-center justify-between">
+                  <CardTitle className="text-lg">Faturamento e Repasses</CardTitle>
+                  <ChevronDown className={cn("h-4 w-4 transition-transform text-muted-foreground", repasseOpen && "rotate-180")} />
+                </CardHeader>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent className="pt-0 space-y-4">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="rounded-md border p-3 text-center"><p className="text-xs text-muted-foreground">Faturamento</p><p className="text-lg font-bold">R$ {faturamento.toFixed(2)}</p></div>
+                    <div className="rounded-md border p-3 text-center"><p className="text-xs text-muted-foreground">Já recebido</p><p className="text-lg font-bold text-success">R$ {faturamentoPago.toFixed(2)}</p></div>
+                    <div className="rounded-md border p-3 text-center"><p className="text-xs text-muted-foreground">Repasse fonos</p><p className="text-lg font-bold text-primary">R$ {totalRepasse.toFixed(2)}</p></div>
+                  </div>
+                  {rows.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center">Nenhum repasse para fonos no período.</p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="p-2 sm:p-4 text-xs sm:text-sm">Fono</TableHead>
+                          <TableHead className="p-2 sm:p-4 text-xs sm:text-sm text-center">Atend.</TableHead>
+                          <TableHead className="p-2 sm:p-4 text-xs sm:text-sm text-right">Pendente</TableHead>
+                          <TableHead className="p-2 sm:p-4 text-xs sm:text-sm text-right">Pago</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {rows.map((row, i) => (
+                          <TableRow key={i}>
+                            <TableCell className="p-2 sm:p-4 text-xs sm:text-sm font-medium">{row.nome}</TableCell>
+                            <TableCell className="p-2 sm:p-4 text-xs sm:text-sm text-center">{row.atendimentos}</TableCell>
+                            <TableCell className="p-2 sm:p-4 text-xs sm:text-sm text-right whitespace-nowrap">R$ {row.pendente.toFixed(2)}</TableCell>
+                            <TableCell className="p-2 sm:p-4 text-xs sm:text-sm text-right whitespace-nowrap">R$ {row.pago.toFixed(2)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                      <TableFooter>
+                        <TableRow>
+                          <TableCell colSpan={2} className="p-2 sm:p-4 text-xs sm:text-sm font-semibold">Total</TableCell>
+                          <TableCell className="p-2 sm:p-4 text-xs sm:text-sm text-right font-bold whitespace-nowrap">R$ {rows.reduce((s, r) => s + r.pendente, 0).toFixed(2)}</TableCell>
+                          <TableCell className="p-2 sm:p-4 text-xs sm:text-sm text-right font-bold whitespace-nowrap">R$ {rows.reduce((s, r) => s + r.pago, 0).toFixed(2)}</TableCell>
+                        </TableRow>
+                      </TableFooter>
+                    </Table>
+                  )}
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
+        );
+      })()}
 
       {/* Resumo por Paciente */}
       {!loading && (() => {
@@ -373,7 +456,7 @@ const Financial = forwardRef<HTMLDivElement, object>(function Financial(_props, 
                     <span>{format(new Date(r.data_cobranca), "dd/MM/yyyy")}</span>
                     <span className="font-semibold text-foreground">R$ {Number(r.valor).toFixed(2)}</span>
                     {r.forma_pagamento && <span>{r.forma_pagamento}</span>}
-                    {(r as any).gerar_nfe && <Badge variant="outline" className="text-[10px]">NFe</Badge>}
+                    {(r as any).gerar_nfe && <Badge variant="outline" className="text-[10px]">NFe{(r as any).percentual_nfe ? ` -${(r as any).percentual_nfe}%` : ""}</Badge>}
                   </div>
                   {r.observacao && <p className="text-xs text-muted-foreground">{r.observacao}</p>}
                   {isAdmin && profileMap[r.user_id] && (
