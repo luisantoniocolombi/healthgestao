@@ -24,6 +24,7 @@ export type Database = {
           hora: string | null
           id: string
           patient_id: string
+          percentual_nfe: number | null
           percentual_parceiro: number | null
           profissional_parceiro_id: string | null
           status: string
@@ -35,6 +36,7 @@ export type Database = {
           updated_at: string
           updated_by: string | null
           user_id: string
+          valor_parceiro: number | null
         }
         Insert: {
           archived?: boolean
@@ -45,6 +47,7 @@ export type Database = {
           hora?: string | null
           id?: string
           patient_id: string
+          percentual_nfe?: number | null
           percentual_parceiro?: number | null
           profissional_parceiro_id?: string | null
           status?: string
@@ -56,6 +59,7 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           user_id: string
+          valor_parceiro?: number | null
         }
         Update: {
           archived?: boolean
@@ -66,6 +70,7 @@ export type Database = {
           hora?: string | null
           id?: string
           patient_id?: string
+          percentual_nfe?: number | null
           percentual_parceiro?: number | null
           profissional_parceiro_id?: string | null
           status?: string
@@ -77,6 +82,7 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           user_id?: string
+          valor_parceiro?: number | null
         }
         Relationships: [
           {
@@ -456,11 +462,13 @@ export type Database = {
           observacao: string | null
           origem: string
           patient_id: string
+          percentual_nfe: number | null
           status_pagamento: string
           updated_at: string
           updated_by: string | null
           user_id: string
           valor: number
+          valor_bruto: number | null
         }
         Insert: {
           appointment_id?: string | null
@@ -475,11 +483,13 @@ export type Database = {
           observacao?: string | null
           origem?: string
           patient_id: string
+          percentual_nfe?: number | null
           status_pagamento?: string
           updated_at?: string
           updated_by?: string | null
           user_id: string
           valor: number
+          valor_bruto?: number | null
         }
         Update: {
           appointment_id?: string | null
@@ -494,11 +504,13 @@ export type Database = {
           observacao?: string | null
           origem?: string
           patient_id?: string
+          percentual_nfe?: number | null
           status_pagamento?: string
           updated_at?: string
           updated_by?: string | null
           user_id?: string
           valor?: number
+          valor_bruto?: number | null
         }
         Relationships: [
           {
